@@ -8,7 +8,8 @@ import { expect, test } from '@playwright/test';
 // броней (#36). Пока честно зелёное — каркас: страницы отвечают 200,
 // инфраструктурный health — {"status":"ok"}; /admin теперь живая панель
 // владельца (#34): типы событий и рабочие часы читаются self-fetch'ем, поэтому
-// заголовки секций — рендер серверных данных.
+// заголовки секций — рендер серверных данных; секция «Брони» (#36) —
+// предстоящие встречи всех типов (?upcoming=true), отмена — вне smoke.
 
 test('публичная страница отвечает 200', async ({ page }) => {
   const response = await page.goto('/');
@@ -22,6 +23,10 @@ test('панель владельца отвечает 200 и показывае
   await expect(page.getByRole('heading', { name: 'Панель владельца' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Новый тип события' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Рабочие часы' })).toBeVisible();
+  // секция «Брони» (#36): рендер серверных данных self-fetch'ем; на свежей
+  // базе — пустое состояние «Предстоящих броней нет»
+  await expect(page.getByRole('heading', { name: 'Брони' })).toBeVisible();
+  await expect(page.getByText('Предстоящих броней нет')).toBeVisible();
 });
 
 test('GET /api/health отвечает {"status":"ok"}', async ({ request }) => {
