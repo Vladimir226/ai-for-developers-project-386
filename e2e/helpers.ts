@@ -91,7 +91,7 @@ export async function expectSlotNotFree(request: APIRequestContext, slotId: stri
 
 /**
  * Клетка дня в календаре публичной страницы: листает месяцы, если день в
- * следующем месяце (окно — сегодня + 31 день, максимум 2 месяца).
+ * следующем месяце (окно записи — 14 дат с сегодняшней, максимум 2 месяца).
  */
 export async function calendarDayButton(
   page: Page,

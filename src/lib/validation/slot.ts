@@ -9,7 +9,7 @@ import { fromZodIssues, type FieldIssue, type ParseResult } from './zod-issues';
 // по ADR-005): доменные правила («в будущем», «конец позже начала», окно
 // периода) и нормализация в UTC-инстанты. Тип интервала принадлежит домену.
 
-export const DEFAULT_PERIOD_DAYS = 31;
+export const DEFAULT_PERIOD_DAYS = 14;
 
 /** Провалидированные параметры `GET /api/v1/slots` в UTC-инстантах. */
 export interface SlotQuery {
@@ -60,7 +60,9 @@ export function parseCreateSlotBody(body: unknown, now: Date): ParseResult<Inter
 
 /**
  * Параметры `GET /api/v1/slots`: `from`/`to` опциональны (дефолт
- * `[now; now + 31 день]`), `view` — `free|all` (дефолт `free`).
+ * `[now; now + 14 дней]` — с запасом накрывает окно записи: 14 настенных
+ * дат с сегодняшней; лишний хвост обрезает календарь публичной страницы),
+ * `view` — `free|all` (дефолт `free`).
  */
 export function parseSlotQuery(
   params: Record<string, string | undefined>,

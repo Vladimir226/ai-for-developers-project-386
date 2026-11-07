@@ -224,7 +224,7 @@ export function BookingFlow({ calendar, tzText }: { calendar: BookingCalendar; t
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-[17px] font-bold tracking-tight">{month.label}</h2>
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline text-[12px] text-muted">окна на месяц вперёд</span>
+            <span className="hidden sm:inline text-[12px] text-muted">окна на 14 дней вперёд</span>
             {calendar.months.length > 1 && (
               <div className="flex items-center gap-1">
                 <button
