@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+dist/
+
+# env
+.env
+.env.*
+!.env.example
+
+# локальная SQLite-БД разработки (ADR-002, §10 architecture.md)
+dev-data/
+
+# tests
+coverage/
+
+# misc
+*.tsbuildinfo
+.DS_Store
+npm-debug.log*

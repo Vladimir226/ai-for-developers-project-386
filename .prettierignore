@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+coverage
+dev-data
+
+# вендорные ассеты установленных скиллов — не трогаем
+.agents
+
+# lock-файл — машинный, форматирование создаёт churn
+package-lock.json
