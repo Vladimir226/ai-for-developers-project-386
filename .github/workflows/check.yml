@@ -1,6 +1,7 @@
-# Единый прогон всех проверок — та же команда, что и локально: make check → npm run check
-# (lint + prettier + тесты). hexlet-check.yml — отдельный автогенерированный workflow
-# Хекслета, его не трогаем.
+# Единый прогон всех проверок — та же команда, что и локально: make check →
+# npm run check (lint + prettier + юнит-тесты + e2e Playwright на настоящем
+# сервере). hexlet-check.yml — отдельный автогенерированный workflow Хекслета,
+# его не трогаем (он гоняет свой smoke по собранному Docker-образу).
 
 name: check
 
@@ -22,6 +23,18 @@ jobs:
 
       - name: Install dependencies
         run: make install
+
+      # Браузер для e2e из `npm run check`. Каталог chromium (~150 МБ) кэшируем
+      # по lock-файлу; шаг идемпотентен — при попадании в кэш `playwright
+      # install` ничего не качает и только сверяет системные зависимости.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
 
       - name: Run all checks
         run: make check
