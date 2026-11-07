@@ -1,0 +1,27 @@
+# Release-PR по Conventional Commits (D8 карты #28): release-please бампает
+# версию в package.json/package-lock.json, ведёт CHANGELOG.md и открывает
+# PR «chore(main): release …» на каждый push в main. Мерж release-PR создаёт
+# тег и GitHub Release — теги и релизы руками не создаём.
+# Отдельный триггер (только main), с check.yml и hexlet-check.yml не пересекается.
+
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # Приложение, не npm-библиотека: публикации в npm нет, стратегия node
+          # нужна только для бампа version в package.json + package-lock.json.
+          release-type: node
