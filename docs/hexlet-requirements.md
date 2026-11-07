@@ -192,9 +192,9 @@ components:
       type: object
       required: [id, title, durationMinutes]
       properties:
-        id: {type: string}
-        title: {type: string}
-        durationMinutes: {type: integer, format: int32}
+        id: { type: string }
+        title: { type: string }
+        durationMinutes: { type: integer, format: int32 }
 ```
 
 Из спецификации генерируется клиентский SDK для фронтенда: типы запросов и ответов вместе с функциями вызова эндпоинтов. На бекенде из той же спецификации генерируются свои артефакты (типы, схемы проверки запросов и заготовки маршрутов), если для фреймворка есть генератор; если нет — серверную часть пишут по контракту, а совпадение проверяют тесты.
