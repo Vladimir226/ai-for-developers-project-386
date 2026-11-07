@@ -3,14 +3,16 @@ import Link from 'next/link';
 import { createServerApiClient } from '@/lib/sdk/server';
 import { getAppTz } from '@/lib/time/app-tz';
 import { tzLabel } from '@/lib/time/display';
-import { adminWindow } from './admin-logic';
+import { adminWindow, buildBookingCards } from './admin-logic';
+import { BookingList } from './BookingList';
 import { PublishForm } from './PublishForm';
 import { SlotList } from './SlotList';
 
 // Панель владельца (FR-002): чтение — RSC self-fetch через SDK (ADR-004,
 // ADR-010), мутации — клиентские компоненты тем же SDK + router.refresh().
 // Окно списка — adminWindow(): все опубликованные интервалы, включая
-// прошедшие (бейдж «Прошёл») и дальние планы.
+// прошедшие (бейдж «Прошёл») и дальние планы. Брони из того же запроса
+// питают бейджи «Забронирован» и секцию «Брони» (тикет #8).
 
 export const dynamic = 'force-dynamic';
 
@@ -22,18 +24,19 @@ export default async function AdminPage() {
   const appTz = getAppTz();
   const now = new Date();
   const { from, to } = adminWindow();
+  const tzText = tzLabel(appTz, now);
 
   const api = await createServerApiClient();
   const [slotsResult, bookingsResult] = await Promise.all([
     api.GET('/api/v1/slots', { params: { query: { view: 'all', from, to } } }),
-    // брони нужны только для бейджа «Забронирован»; сам список броней — тикет #8
     api.GET('/api/v1/bookings'),
   ]);
 
   // self-fetch того же процесса падает только вместе со всей страницей;
-  // при частичном отказе список деградирует без статусов броней
+  // при частичном отказе списки деградируют каждый без своего блока данных
   const slots = slotsResult.data?.slots ?? null;
-  const bookedSlotIds = bookingsResult.data?.bookings.map((b) => b.slotId) ?? null;
+  const bookings = bookingsResult.data?.bookings ?? null;
+  const bookedSlotIds = bookings ? bookings.map((b) => b.slotId) : null;
 
   return (
     <div className="bg-paper text-ink font-sans antialiased min-h-screen flex flex-col">
@@ -80,7 +83,7 @@ export default async function AdminPage() {
               Панель владельца
             </h1>
             <p className="mt-2 text-[15px] text-muted">
-              Публикуйте интервалы и управляйте бронями. Все времена — {tzLabel(appTz, now)}.
+              Публикуйте интервалы и управляйте бронями. Все времена — {tzText}.
             </p>
           </div>
         </div>
@@ -96,8 +99,9 @@ export default async function AdminPage() {
             </div>
           </section>
 
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 space-y-8">
             <SlotList slots={slots} bookedSlotIds={bookedSlotIds} appTz={appTz} now={now} />
+            <BookingList bookings={buildBookingCards(bookings, appTz)} tzText={tzText} />
           </div>
         </div>
       </main>
@@ -105,7 +109,7 @@ export default async function AdminPage() {
       <footer className="border-t border-line">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between text-[12.5px] text-muted">
           <span>«Запись на звонок»</span>
-          <span>Время — {tzLabel(appTz, now)}</span>
+          <span>Время — {tzText}</span>
         </div>
       </footer>
     </div>

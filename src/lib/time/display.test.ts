@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { countIntervals, formatInterval, formatTimeRange, tzLabel } from './display';
+import {
+  countActiveBookings,
+  countIntervals,
+  formatInterval,
+  formatTimeRange,
+  tzLabel,
+} from './display';
 
 // Шов 3 (unit): отображение времени в APP_TZ (ADR-009) в форматах макета
 // admin.html (#13): «вт, 10 ноября · 10:00–10:30», «Москва, UTC+3».
@@ -67,5 +73,20 @@ describe('countIntervals', () => {
     expect(countIntervals(22)).toBe('22 интервала');
     expect(countIntervals(101)).toBe('101 интервал');
     expect(countIntervals(111)).toBe('111 интервалов');
+  });
+});
+
+describe('countActiveBookings', () => {
+  it('склоняет по правилам русского языка (женский род, макет: «1 активная»)', () => {
+    expect(countActiveBookings(0)).toBe('0 активных');
+    expect(countActiveBookings(1)).toBe('1 активная');
+    expect(countActiveBookings(2)).toBe('2 активные');
+    expect(countActiveBookings(4)).toBe('4 активные');
+    expect(countActiveBookings(5)).toBe('5 активных');
+    expect(countActiveBookings(11)).toBe('11 активных');
+    expect(countActiveBookings(21)).toBe('21 активная');
+    expect(countActiveBookings(22)).toBe('22 активные');
+    expect(countActiveBookings(101)).toBe('101 активная');
+    expect(countActiveBookings(111)).toBe('111 активных');
   });
 });
