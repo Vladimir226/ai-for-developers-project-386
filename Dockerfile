@@ -56,7 +56,13 @@ RUN chmod +x docker-entrypoint.sh
 # непривилегированный пользователь (NFR-007)
 USER node
 
+# информативно: 3000 — дефолт (ENV PORT выше); фактический порт задаётся
+# переменной PORT (например docker run -e PORT=8080 … -p 8080:8080),
+# healthcheck ниже следует за PORT автоматически
 EXPOSE 3000
+# shell-форма CMD: /bin/sh -c раскрывает ${PORT:-3000} в рантайме контейнера,
+# поэтому проба здоровья бьёт в тот же порт, на котором слушает сервер,
+# а не в захардкоженный 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:' + (${PORT:-3000}) + '/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["./docker-entrypoint.sh"]

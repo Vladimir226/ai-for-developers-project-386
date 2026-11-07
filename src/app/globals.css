@@ -1,6 +1,15 @@
 @import 'tailwindcss';
 
 /*
+ * Manrope — самохостинг из npm (#29): font-family объявляет
+ * @fontsource-variable/manrope (импорт в layout.tsx), здесь только alias.
+ * Переменную сохраняем: --font-sans ниже ссылается на неё.
+ */
+:root {
+  --font-manrope: 'Manrope Variable';
+}
+
+/*
  * Дизайн-токены направления C «Спокойный шалфей» (docs/design/README.md,
  * тикет #13) — перенесены из прототипа, не подключением прототипа.
  */
