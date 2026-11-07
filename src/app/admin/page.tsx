@@ -1,17 +1,40 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { createServerApiClient } from '@/lib/sdk/server';
+import { getAppTz } from '@/lib/time/app-tz';
+import { tzLabel } from '@/lib/time/display';
+import { EventTypeForm } from './EventTypeForm';
+import { EventTypeList } from './EventTypeList';
+import { WorkingHoursForm } from './WorkingHoursForm';
 
-// TODO(#33): панель по новому API (#32) — типы событий (CRUD, каскадное
-// удаление броней D4) и рабочие часы недели (GET/PUT). TODO(#35): UI
-// управления. Прежняя панель ручной публикации интервалов удалена вместе с
-// POST/DELETE /api/v1/slots (ADR-0011); роуты вернутся в #33, до тех пор
-// страница — статичная заглушка без данных.
+// Панель владельца (#34): типы событий (CRUD, каскадное удаление D4) и
+// рабочие часы недели (D3). Чтение — RSC self-fetch через SDK (ADR-004,
+// ADR-010), мутации — клиентские компоненты тем же SDK + router.refresh().
+// Брони — плейсхолдер до #36. Рабочие часы — «настенное» время APP_TZ
+// (ADR-009), в контракт уходят минуты от полуночи.
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Панель владельца — Запись на звонок',
 };
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  const appTz = getAppTz();
+  const now = new Date();
+  const tzText = tzLabel(appTz, now);
+
+  const api = await createServerApiClient();
+  const [eventTypesResult, hoursResult] = await Promise.all([
+    api.GET('/api/v1/event-types'),
+    api.GET('/api/v1/working-hours'),
+  ]);
+
+  // self-fetch того же процесса падает только вместе со всей страницей;
+  // при частичном отказе каждая секция деградирует без своих данных
+  const eventTypes = eventTypesResult.data?.eventTypes ?? null;
+  const workingDays = hoursResult.data?.days ?? null;
+
   return (
     <div className="bg-paper text-ink font-sans antialiased min-h-screen flex flex-col">
       <header className="border-b border-line bg-card/70">
@@ -48,24 +71,61 @@ export default function AdminPage() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 pt-10 pb-16 flex-1">
-        <h1 className="text-[30px] sm:text-[34px] font-extrabold tracking-tight">
-          Панель владельца
-        </h1>
-        <section
-          aria-label="Управление временно недоступно"
-          className="mt-8 rounded-2xl border border-line bg-card px-6 py-12 text-center shadow-[0_1px_3px_rgba(55,53,47,0.04)]"
-        >
-          <p className="text-[15px] leading-relaxed text-muted max-w-[52ch] mx-auto">
-            Управление переходит на модель «типы событий + рабочие часы»: владелец задаст виды
-            броней с длительностью и рабочие часы недели, слоты будут вычисляться автоматически.
-            Загляните чуть позже.
+        <div>
+          <h1 className="text-[30px] sm:text-[34px] font-extrabold tracking-tight">
+            Панель владельца
+          </h1>
+          <p className="mt-2 text-[15px] text-muted">
+            Управляйте видами броней и рабочими часами — слоты пересчитываются сами. Все времена —{' '}
+            {tzText}.
           </p>
+        </div>
+
+        <section aria-label="Типы событий" className="mt-8">
+          <div className="grid lg:grid-cols-12 gap-8 lg:gap-10">
+            <div className="lg:col-span-5">
+              <div className="lg:sticky lg:top-8 rounded-2xl border border-line bg-card p-5 sm:p-7 shadow-[0_1px_3px_rgba(55,53,47,0.04)]">
+                <h2 className="text-[19px] font-bold tracking-tight">Новый тип события</h2>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
+                  Вид брони с фиксированной длительностью: гость увидит его на публичной странице.
+                </p>
+                <EventTypeForm submitLabel="Создать тип" />
+              </div>
+            </div>
+            <div className="lg:col-span-7">
+              <EventTypeList eventTypes={eventTypes} />
+            </div>
+          </div>
+        </section>
+
+        <section aria-label="Рабочие часы" className="mt-10">
+          <div className="rounded-2xl border border-line bg-card px-5 sm:px-7 py-6 shadow-[0_1px_3px_rgba(55,53,47,0.04)]">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-[19px] font-bold tracking-tight">Рабочие часы</h2>
+              <span className="text-[12.5px] text-muted">Время — {tzText}</span>
+            </div>
+            <p className="mt-1.5 mb-5 text-[13.5px] leading-relaxed text-muted max-w-[64ch]">
+              Слоты генерируются внутри рабочих часов каждого дня; выходной — без слотов.
+            </p>
+            <WorkingHoursForm initialDays={workingDays} />
+          </div>
+        </section>
+
+        {/* TODO(#36): список броней владельца и отмена (GET/DELETE /api/v1/bookings). */}
+        <section aria-label="Брони" className="mt-10">
+          <div className="rounded-2xl border border-line bg-card px-6 py-10 text-center shadow-[0_1px_3px_rgba(55,53,47,0.04)]">
+            <h2 className="text-[19px] font-bold tracking-tight">Брони</h2>
+            <p className="mt-2 text-[14px] leading-relaxed text-muted max-w-[52ch] mx-auto">
+              Список предстоящих броней всех типов и отмена появятся здесь в ближайшем обновлении.
+            </p>
+          </div>
         </section>
       </main>
 
       <footer className="border-t border-line">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between text-[12.5px] text-muted">
           <span>«Запись на звонок»</span>
+          <span>Время — {tzText}</span>
         </div>
       </footer>
     </div>
