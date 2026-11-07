@@ -1,0 +1,27 @@
+# Единый прогон всех проверок — та же команда, что и локально: make check → npm run check
+# (lint + prettier + тесты). hexlet-check.yml — отдельный автогенерированный workflow
+# Хекслета, его не трогаем.
+
+name: check
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Run all checks
+        run: make check

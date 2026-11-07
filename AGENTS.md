@@ -1,5 +1,29 @@
 # Agent instructions
 
+## Команды
+
+```bash
+npm install      # зависимости (postinstall сам выполнит prisma generate); Node 22 — из .nvmrc
+npm run dev      # запуск: http://localhost:3000 (Next.js — бекенд и фронтенд вместе)
+npm run check    # все проверки: lint + prettier + тесты; CI гоняет то же самое (make check)
+npm test         # только тесты (vitest)
+npm run lint     # только линтеры: eslint + tsc --noEmit + redocly + drift-check контракта
+```
+
+## Устройство проекта
+
+- `src/app/` — Next.js App Router: страницы и API-роуты (`api/health`, `api/v1/slots`)
+- `src/domain/` — доменная логика без HTTP и БД; `src/lib/` — инфраструктура: Prisma, валидация, SDK-клиент, логирование
+- `contract/` — TypeSpec-контракт API, источник истины; `npm run contract:gen` генерирует `src/generated/` (коммитится, расхождение ловит drift-check)
+- `prisma/` — схема и миграции (SQLite + WAL)
+- CI: наш `.github/workflows/check.yml` вызывает `make check`; `hexlet-check.yml` — автогенерированный Хекслетом, не трогать
+
+Правила, которые из кода не читаются: сервер — источник истины, UI ходит через SDK и `router.refresh()` (ADR-004); время храним и передаём в UTC, отображаем в `APP_TZ` (ADR-009); один Docker-образ, БД — файл в volume `/data` (ADR-007).
+
+## Коммиты
+
+Формат — Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, скоуп по вкусу — `feat(slots): …`.
+
 ## Agent skills
 
 ### Issue tracker

@@ -1,5 +1,6 @@
-# Makefile — цели для hexlet-check CI (ADR-007).
-# Делегируют в npm-скрипты; workflow .github/workflows/hexlet-check.yml не трогаем.
+# Makefile — единая точка входа; делегирует в npm-скрипты (ADR-007).
+# CI (.github/workflows/check.yml) вызывает make check — ту же команду, что и локально.
+# .github/workflows/hexlet-check.yml — автогенерированный Хекслетом, не трогаем.
 
 install:
 	npm install
@@ -10,4 +11,7 @@ test:
 lint:
 	npm run lint
 
-.PHONY: install test lint
+check:
+	npm run check
+
+.PHONY: install test lint check
