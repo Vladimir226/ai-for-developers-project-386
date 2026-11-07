@@ -15,7 +15,13 @@ const { PrismaClient } = require('@prisma/client');
 const db = new PrismaClient();
 db.$queryRawUnsafe('PRAGMA journal_mode = WAL')
   .then((rows) => {
-    console.log(`[entrypoint] SQLite journal_mode = ${rows[0].journal_mode}`);
+    // PRAGMA не бросает ошибку при неудаче — возвращает фактический режим,
+    // поэтому сверяем сами и падаем ярко, а не живём с невыключенным WAL
+    const mode = rows[0]?.journal_mode;
+    if (mode !== 'wal') {
+      throw new Error(`SQLite journal_mode = ${mode}, ожидался wal`);
+    }
+    console.log('[entrypoint] SQLite journal_mode = wal');
     return db.$disconnect();
   })
   .catch((error) => {

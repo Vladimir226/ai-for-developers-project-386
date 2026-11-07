@@ -17,6 +17,11 @@ function makeClient(url: string): PrismaClient {
   return client;
 }
 
+async function tmpDbUrl(): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'bac-connection-'));
+  return `file:${path.join(dir, 'app.db')}`;
+}
+
 afterEach(async () => {
   await Promise.all(clients.map((client) => client.$disconnect()));
   clients.length = 0;
@@ -24,8 +29,7 @@ afterEach(async () => {
 
 describe('applyConnectionPragmas', () => {
   it('включает WAL и busy_timeout на соединении', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'bac-connection-'));
-    const db = makeClient(`file:${path.join(dir, 'app.db')}`);
+    const db = makeClient(await tmpDbUrl());
 
     const result = await applyConnectionPragmas(db);
 
@@ -34,20 +38,19 @@ describe('applyConnectionPragmas', () => {
   });
 
   it('WAL — постоянное свойство файла: переживает новое соединение', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'bac-connection-'));
-    const first = makeClient(`file:${path.join(dir, 'app.db')}`);
+    const url = await tmpDbUrl();
+    const first = makeClient(url);
     await applyConnectionPragmas(first);
     await first.$disconnect();
 
-    const second = makeClient(`file:${path.join(dir, 'app.db')}`);
+    const second = makeClient(url);
     const rows = await second.$queryRawUnsafe<{ journal_mode: string }[]>('PRAGMA journal_mode');
 
     expect(rows[0]?.journal_mode).toBe('wal');
   });
 
   it('идемпотентен: повторное применение не ломает соединение', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'bac-connection-'));
-    const db = makeClient(`file:${path.join(dir, 'app.db')}`);
+    const db = makeClient(await tmpDbUrl());
 
     await applyConnectionPragmas(db);
     const result = await applyConnectionPragmas(db);
@@ -59,8 +62,7 @@ describe('applyConnectionPragmas', () => {
     // Пиннинг допущения, на котором стоит дизайн: Prisma-клиент держит
     // соединение, на котором мы применили прагму, и не подменяет его
     // новым (без busy_timeout) в конкурентных запросах (#6).
-    const dir = await mkdtemp(path.join(tmpdir(), 'bac-connection-'));
-    const db = makeClient(`file:${path.join(dir, 'app.db')}`);
+    const db = makeClient(await tmpDbUrl());
     await applyConnectionPragmas(db);
 
     await Promise.all(Array.from({ length: 20 }, () => db.$queryRawUnsafe('SELECT 1')));

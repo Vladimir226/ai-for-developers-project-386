@@ -33,7 +33,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    APP_TZ=UTC \
+    APP_TZ=Europe/Moscow \
     DATABASE_URL=file:/data/app.db
 
 # каталог БД под volume /data; создаём и передаём node до dropping привилегий
@@ -41,6 +41,8 @@ RUN mkdir -p /data && chown node:node /data
 
 # standalone-выход Next.js: server.js + трассированные зависимости.
 # Исходников, тестов и .env здесь нет и не будет (.dockerignore).
+# Каталог public/ появится со статикой UI-тикетов — тогда добавить
+# COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 # прод-зависимости поверх трассированных: prisma CLI + engine-бинари

@@ -23,10 +23,15 @@ async function freshGetDb() {
   return dbModule.getDb;
 }
 
+async function tmpDir(): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'bac-prisma-'));
+  tmpDirs.push(dir);
+  return dir;
+}
+
 describe('getDb', () => {
   it('создаёт клиент с применёнными прагмами (WAL)', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'bac-prisma-'));
-    tmpDirs.push(dir);
+    const dir = await tmpDir();
     vi.stubEnv('DATABASE_URL', `file:${path.join(dir, 'nested', 'app.db')}`);
 
     const getDb = await freshGetDb();
@@ -37,8 +42,7 @@ describe('getDb', () => {
   });
 
   it('один и тот же инстанс на повторные вызовы', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'bac-prisma-'));
-    tmpDirs.push(dir);
+    const dir = await tmpDir();
     vi.stubEnv('DATABASE_URL', `file:${path.join(dir, 'app.db')}`);
 
     const getDb = await freshGetDb();
@@ -49,8 +53,7 @@ describe('getDb', () => {
   });
 
   it('создаёт недостающий каталог файла БД', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'bac-prisma-'));
-    tmpDirs.push(dir);
+    const dir = await tmpDir();
     const dbPath = path.join(dir, 'deep', 'nested', 'app.db');
     vi.stubEnv('DATABASE_URL', `file:${dbPath}`);
 

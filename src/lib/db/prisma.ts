@@ -26,7 +26,7 @@ function databaseUrl(): string {
  * SQLite не умеет создавать родительские каталоги сам; в контейнере
  * /data существует (Dockerfile), локально каталог может отсутствовать.
  */
-export async function ensureDatabaseDir(url: string): Promise<void> {
+async function ensureDatabaseDir(url: string): Promise<void> {
   if (!url.startsWith('file:')) return;
   const filePath = url.slice('file:'.length).split('?')[0].trim();
   if (!filePath || filePath.includes(':memory:')) return;
