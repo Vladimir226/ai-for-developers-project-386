@@ -24,9 +24,10 @@ jobs:
       - name: Install dependencies
         run: make install
 
-      # Браузер для e2e из `npm run check`. Каталог chromium (~150 МБ) кэшируем
-      # по lock-файлу; шаг идемпотентен — при попадании в кэш `playwright
-      # install` ничего не качает и только сверяет системные зависимости.
+      # Браузер для e2e из `npm run check`. Каталог браузеров (~300 МБ:
+      # chromium + headless shell + ffmpeg) кэшируем по lock-файлу; шаг
+      # идемпотентен — при попадании в кэш `playwright install` ничего не
+      # качает и только сверяет системные зависимости.
       - name: Cache Playwright browsers
         uses: actions/cache@v6
         with:
