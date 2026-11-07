@@ -5,13 +5,23 @@ import { logRequestLine } from '@/lib/logger';
 //
 // Паттерн для всех Route Handlers:
 //   `export const GET = withRequestLogging(async (request) => ...)`.
+// Для динамических маршрутов context (params) прокидывается насквозь
+// (перегрузка сохраняет обязательность второго аргумента — Next валидирует
+// сигнатуру экспорта при сборке):
+//   `withRequestLogging<{ params: Promise<{ id: string }> }>(async (request, { params }) => ...)`.
 // request-id приходит из middleware (src/middleware.ts); здесь — только
 // fallback на случай прямого вызова handler'а (тесты шва 1).
 
-type Handler = (request: Request) => Promise<Response>;
-
-export function withRequestLogging(handler: Handler): Handler {
-  return async (request) => {
+export function withRequestLogging(
+  handler: (request: Request) => Promise<Response>,
+): (request: Request) => Promise<Response>;
+export function withRequestLogging<C>(
+  handler: (request: Request, context: C) => Promise<Response>,
+): (request: Request, context: C) => Promise<Response>;
+export function withRequestLogging(
+  handler: (request: Request, ...context: unknown[]) => Promise<Response>,
+): (request: Request, ...context: unknown[]) => Promise<Response> {
+  return async (request, ...context) => {
     const startedAt = Date.now();
     const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
     const base = {
@@ -23,7 +33,7 @@ export function withRequestLogging(handler: Handler): Handler {
     };
 
     try {
-      const response = await handler(request);
+      const response = await handler(request, ...context);
       const enriched = new Response(response.body, response);
       enriched.headers.set('x-request-id', requestId);
       logRequestLine({ ...base, status: enriched.status, durationMs: Date.now() - startedAt });
