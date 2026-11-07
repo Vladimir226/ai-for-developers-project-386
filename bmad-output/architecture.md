@@ -1,6 +1,6 @@
 # System Architecture: «Запись на звонок» (Book-a-Call)
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Date:** 2026-11-07
 **Author:** Winston (Architect)
 **Track:** BMad Method
@@ -128,368 +128,31 @@ Components — self-fetch собственного API) и все мутации
 
 > Минимальный набор BMad (API style, data model, AuthN/AuthZ, state, errors,
 > naming) + специфика проекта (контейнеризация, модель слотов, время).
-
-| ADR     | Title                                                                          | Status   | Drives                           |
-| ------- | ------------------------------------------------------------------------------ | -------- | -------------------------------- |
-| ADR-001 | REST + JSON API с префиксом `/api/v1`                                          | Accepted | FR-001…007, NFR-005              |
-| ADR-002 | SQLite (WAL) через Prisma; файл БД в volume                                    | Accepted | NFR-001, NFR-002, NFR-008        |
-| ADR-003 | Без аутентификации; single-owner модель                                        | Accepted | NFR-007 (минимум)                |
-| ADR-004 | Server-authoritative state; без клиентского стора                              | Accepted | FR-003, FR-006, NFR-003          |
-| ADR-005 | Конверт ошибок и ответов API                                                   | Accepted | NFR-005, NFR-007                 |
-| ADR-006 | Naming conventions (URL/JSON/DB/TS/UI)                                         | Accepted | NFR-003                          |
-| ADR-007 | Один Docker-образ: multi-stage, non-root, volume, healthcheck; Makefile для CI | Accepted | NFR-001, NFR-008, NFR-009        |
-| ADR-008 | Модель слотов: конкретные дискретные интервалы; 1 интервал = 1 звонок          | Accepted | FR-001, FR-004, FR-005           |
-| ADR-009 | Время: хранение и передача UTC, отображение в APP_TZ                           | Accepted | FR-003, NFR-004                  |
-| ADR-010 | Контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod; сервер по контракту            | Accepted | FR-001…007, NFR-003, NFR-005, ТЗ |
-
-### ADR-001: REST + JSON API с префиксом `/api/v1`
-
-**Status:** Accepted **Drives:** FR-001…FR-007, NFR-005
-
-**Context:** Мутации выполняются из клиентских компонентов, и одновременно API —
-публичный контракт приложения. Нужен один стиль, чтобы все истории, трогающие
-эндпоинты, не расходились.
-
-**Decision:** Все HTTP-интерфейсы — REST с JSON-телами. Базовый префикс
-`/api/v1/`. Ресурсы — существительные во множественном числе. Никаких GraphQL,
-RPC-эндпоинтов или bespoke-обёрток поверх REST.
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: один стиль контракта для всех агентов; тривиальный e2e через `fetch`.
-- Accepted cost: нет гибкости GraphQL в выборе полей. Mitigation: полезная
-  нагрузка мала (список слотов), вложенность не нужна.
-
-**Alternatives:** GraphQL (драйвера нет, усложняет сервер и типы); gRPC
-(браузерный клиент требует proxy-слоя).
-
-**Revisit when:** появится второй клиентский платформа или запросы на
-подборки данных, которые не ложатся на REST-ресурсы.
-
----
-
-### ADR-002: SQLite (WAL) через Prisma; файл БД в volume
-
-**Status:** Accepted **Drives:** NFR-001, NFR-002, NFR-008
-
-**Context:** Драйвер NFR-001 — один образ, `docker run` без внешних зависимостей.
-Отдельный сервер БД (PostgreSQL) превратил бы «запуск контейнера» в запуск
-стека. Против этого и ограничение самого задания.
-
-**Decision:** СУБД — SQLite, режим WAL включён при старте. Доступ — через
-Prisma ORM (provider `sqlite`). Файл БД живёт в каталоге `/data` внутри
-контейнера, который монтируется как volume. Все миграции — Prisma Migrate;
-схема меняется только через миграции, не вручную.
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: нулевая настройка окружения; бэкап = копия одного файла; WAL даёт
-  конкурентное чтение при последовательной записи.
-- Accepted cost: одна запись одновременно; нет сетевого доступа к БД;
-  типы SQLite беднее (нет нативных enum/таймзон — см. ADR-009).
-  Mitigation: демо-нагрузка единственного инстанса; enum-поля — текстовые
-  с проверкой на уровне приложения.
-
-**Alternatives:** PostgreSQL (нарушает single-image драйвер; путь миграции
-описан в Future Considerations); embedded Postgres в контейнере (нет
-поддерживаемого простого пути); в памяти (теряет NFR-001 про volume).
-
-**Revisit when:** потребуются несколько инстансов приложения или конкурентная
-запись, измеримо ограничивающая демо.
-
----
-
-### ADR-003: Без аутентификации; single-owner модель
-
-**Status:** Accepted **Drives:** NFR-007 (минимум), PRD (explicit)
-
-**Context:** PRD явно исключает авторизацию и личные кабинеты. Приложение
-обслуживает ровно одного владельца. Любая система токенов/сессий — за рамками
-масштаба и нарушает постановку задачи.
-
-**Decision:** AuthN/AuthZ отсутствует. Модель single-owner: страницы `/admin`
-(управление интервалами и бронями) публично доступны, как и публичная страница
-бронирования `/`. Ролей, сессий, пользователей в схеме БД нет.
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: не тратится ни одна история на auth-инфраструктуру.
-- Accepted cost: любой знающий URL может управлять интервалами. Mitigation:
-  проект учебный, публичного продакшена нет; задокументировано как осознанный
-  риск; путь добавления токена — в Future Considerations.
-
-**Alternatives:** статический ADMIN_TOKEN из env (минимальный, но уже auth —
-нарушает PRD); OAuth (явно за рамками).
-
-**Revisit when:** приложение будет опубликовано в публичный доступ.
-
----
-
-### ADR-004: Server-authoritative state; без клиентского стора
-
-**Status:** Accepted (amended by ADR-010) **Drives:** FR-003, FR-006, NFR-003
-
-**Context:** Состояние системы — интервалы и брони — целиком живёт на сервере.
-Клиенту нужен только локальный UI-state (открытая форма, выбранный слот).
-Введение Redux/Zustand без серверного состояния — церемония без выгоды.
-
-**Decision (поправлено ADR-010):** Сервер — единственный источник истины.
-Чтение — React Server Components через сгенерированный SDK (self-fetch
-собственного API `/api/v1/*`, страницы динамические); мутации — вызовы Route
-Handlers тем же SDK, затем `router.refresh()` для ре-рендера серверных
-данных. Прямые импорты доменных модулей из UI-слоя запрещены. Клиентский
-стор (Redux/Zustand) не вводится; локальный UI-state —
-`useState`/`useOptimistic`. Таймзонные преобразования для отображения — на
-сервере (ADR-009).
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: нет рассинхронизации кэшей; один паттерн обновления данных для всех
-  UI-историй.
-- Accepted cost: полный round-trip после каждой мутации. Mitigation: payloads
-  малы, NFR-005 допускает 300 мс p95.
-
-**Alternatives:** Zustand + клиентский кэш (лишний слой при серверных данных);
-React Query/SWR поверх RSC (дублирует серверное чтение).
-
-**Revisit when:** появятся live-обновления слотов (кто-то забронировал — слот
-исчез у другого посетителя), требующие клиентских подписок.
-
----
-
-### ADR-005: Конверт ошибок и ответов API
-
-**Status:** Accepted (amended by ADR-010) **Drives:** NFR-005, NFR-007
-
-**Context:** Клиент и e2e-тесты должны одинаково интерпретировать любую ошибку.
-Без зафиксированной формы каждый агент изобретёт свой формат.
-
-**Decision:**
-
-- Успех: `200`/`201` с JSON-телом ресурса; `204` без тела для DELETE.
-- Ошибка: всегда JSON `{"error": {"code": "<MACHINE_CODE>", "message": "<человекочитаемо, ru>", "details": {...}?}}`.
-- Коды HTTP: `400` — битый запрос (не JSON/не тот Content-Type);
-  `404` — ресурс не найден; `409` — конфликт состояния (интервал уже забронирован,
-  пересечение интервалов); `422` — ошибка валидации полей (details содержит
-  список `field`/`message`); `500` — непредвиденная ошибка сервера.
-- `error.code` — SCREAMING_SNAKE_CASE, стабильный машинный контракт
-  (`SLOT_ALREADY_BOOKED`, `SLOT_OVERLAP`, `VALIDATION_ERROR`, `NOT_FOUND`).
-- Валидация тела — Zod-схемы, генерируемые из OpenAPI-контракта (ADR-010);
-  hand-written схемы допустимы только как дополнение для field-level
-  UX-сообщений и помечаются источником.
-
-**Consequences — LOCKED for all stories:** все Route Handlers возвращают
-исключительно эти формы; клиентская обработка ошибок — только по `error.code`.
-
-- Easier: единая обработка ошибок в UI и тестах.
-- Accepted cost: чуть больше boilerplate на каждый handler. Mitigation:
-  общий helper `jsonError(code, status, message, details)`.
-
-**Alternatives:** JSON:API errors (тяжелее, чем нужно); Problem Details RFC 7807
-(приемлемо, но выбран более простой собственный конверт).
-
-**Revisit when:** появится внешнее API-потребление с требованиями стандартов.
-
----
-
-### ADR-006: Naming conventions
-
-**Status:** Accepted **Drives:** NFR-003
-
-**Context:** Дешёвое сейчас и дорогое потом решение: без фиксации агенты
-разъедутся по casing в URL, JSON, БД и TypeScript.
-
-**Decision:**
-
-- URL: kebab-case пути, ресурсы во множественном числе (`/api/v1/bookings`).
-- JSON: поля — camelCase (`bookerName`, `startsAt`).
-- БД (SQLite/Prisma): таблицы и колонки — snake_case (`booker_name`),
-  в Prisma-схеме поля camelCase с `@map`.
-- TypeScript: типы/классы — PascalCase; переменные/функции — camelCase;
-  файлы компонентов — PascalCase.tsx, остальные — kebab-case.ts.
-  Оговорка: зарезервированные имена файлов Next.js App Router
-  (`page.tsx`, `layout.tsx`, `route.ts`, `middleware.ts` и т.п.) остаются в
-  нижнем регистре — переименование ломает роутинг.
-- Идентификаторы в коде — английские; строки UI — русские.
-- Сущности домена: `Slot` (опубликованный интервал), `Booking` (бронь).
-
-**Consequences — LOCKED for all stories:** новая сущность/эндпоинт следует
-таблице выше без исключений; ревью историй отклоняет отклонения.
-
-- Easier: предсказуемые имена → меньше правок при слиянии.
-- Accepted cost: `@map`-дисциплина в Prisma-схеме.
-
-**Alternatives:** единый casing везде (потеря идиоматичности на каждом слое).
-
-**Revisit when:** — (конвенция не пересматривается, только расширяется).
-
----
-
-### ADR-007: Один Docker-образ: multi-stage, non-root, volume, healthcheck; Makefile для CI
-
-**Status:** Accepted **Drives:** NFR-001, NFR-008, NFR-009
-
-**Context:** Главное ограничение задания — сборка в Docker-образ и запуск в
-контейнере. Плюс ограничение репозитория: hexlet-check CI должен проходить,
-Makefile-цели обязаны существовать и быть зелёными.
-
-**Decision:**
-
-- Один `Dockerfile` с multi-stage сборкой: `deps` → `builder` (prisma generate,
-  next build) → `runner` на `node:22-alpine` с `output: "standalone"`.
-- В runtime-образ не попадают dev-зависимости, исходники тестов и `.env`.
-- Контейнер выполняется от непривилегированного пользователя `node` (NFR-007).
-- Файл БД — `/data/app.db`; каталог `/data` монтируется volume
-  (`docker run -p 3000:3000 -v book-a-call-data:/data …`).
-- `HEALTHCHECK` в образе бьёт в `/api/health`.
-- Порт контейнера — `3000`; конфигурация — только через переменные окружения
-  (`APP_TZ`, `DATABASE_URL` со значением по умолчанию
-  `file:/data/app.db`); секретов в образе нет.
-- В корне репозитория — `Makefile` с целями `install`, `test`, `lint`
-  (делегируют в npm-скрипты) для hexlet-check CI; workflow-файл Хекслета не
-  трогаем.
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: доставка = `docker build` + `docker run`; CI не требует БД.
-- Accepted cost: standalone-выход Next.js требует аккуратного копирования
-  `.next/standalone` + `.next/static` + `public`. Mitigation: сборка проверяется
-  локально на каждой истории, затрагивающей Dockerfile.
-
-**Alternatives:** docker-compose с Postgres (нарушает single-image смысл
-задания); single-stage образ (размер и секреты); запуск от root (нарушает
-NFR-007).
-
-**Revisit when:** появится требование отдельного БД-сервиса или CDN-статика.
-
----
-
-### ADR-008: Модель слотов: конкретные дискретные интервалы; 1 интервал = 1 звонок
-
-**Status:** Accepted **Drives:** FR-001, FR-004, FR-005
-
-**Context:** Cal.com генерирует слоты из правил повторяемости и длительности
-событий. Для упрощённой версии нужен минимальный, но честный механизм:
-PRD говорит «владелец публикует доступные интервалы», ни слова о правилах
-повторения.
-
-**Decision:** Владелец публикует **конкретные дискретные интервалы** — каждый
-интервал `Slot(starts_at, ends_at)` и есть один бронируемый звонок. Правил
-повторяемости, нарезки на длительности и буферов нет. Свободность слота —
-отсутствие связанной брони. Защита от двойного бронирования — UNIQUE-констрейнт
-`Booking.slot_id` (сверху — транзакция в сервисном слое; истина — констрейнт,
-NFR-002). Отмена брони — DELETE строки брони; слот автоматически становится
-свободным. Удаление слота каскадно удаляет связанную бронь.
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: модель из двух таблиц; гонки решает БД, а не код.
-- Accepted cost: владелец вводит каждый интервал вручную; статусная история
-  броней не хранится. Mitigation: осознанное упрощение PRD; расширения —
-  в Future Considerations.
-
-**Alternatives:** правила доступности + генерация слотов на лету (в разы больше
-логики и граничных случаев без питающего FR); статус `cancelled` вместо DELETE
-(нужен partial unique index, Prisma+SQLite — через raw SQL).
-
-**Revisit when:** понадобится повторяющаяся доступность («каждый вторец 10:00–14:00»)
-или история отмен.
-
----
-
-### ADR-009: Время: хранение и передача UTC, отображение в APP_TZ
-
-**Status:** Accepted **Drives:** FR-003, NFR-004
-
-**Context:** Бронирование — домен, где таймзоны делают классические баги.
-SQLite хранит DateTime как строку без зоны; single-owner приложение с
-русскоязычным UI.
-
-**Decision:** Все моменты времени хранятся в БД и передаются по API строго
-как **UTC** (ISO 8601 с `Z`: `2026-11-20T10:00:00.000Z`). Единственная зона
-отображения — переменная окружения `APP_TZ` (по умолчанию `Europe/Moscow`);
-форматирование для UI выполняется на сервере (`Intl.DateTimeFormat` с
-`timeZone: APP_TZ`, локаль `ru-RU`). Клиент не преобразует зоны. Схема валидации
-Zod принимает только ISO 8601 со смещением/Z и нормализует в UTC. Интервал
-валиден, если `starts_at < ends_at` и `starts_at` в будущем на момент создания.
-
-_Поправка (аддендум #5, 2026-11-07):_ единственное исключение — ввод
-«настенного» времени в форме публикации интервалов: поля `date`/`time` живут в
-зоне владельца, а контракт принимает только ISO со смещением/Z, поэтому чистая
-утилита `wallTimeToUtcIso(date, time, APP_TZ)` (Intl-roundtrip, без библиотек)
-переводит ввод в UTC-метку на клиенте. Исходные опасения сняты: используется
-зона `APP_TZ`, а не зона браузера (рассинхрона нет), и DST-края зафиксированы
-unit-тестами (шов 3, `src/lib/time/wall-time.ts`).
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: одна точка правды о времени; детерминированные тесты (UTC).
-- Accepted cost: посетитель из другой зоны видит время владельца.
-  Mitigation: в UI подпись «время владельца» (часовой пояс указан).
-
-**Alternatives:** хранить локальное время строкой (不可 сравнение и сортировка);
-конвертация на клиенте (рассинхрон и баги DST).
-
-**Revisit when:** появится мультивладельческая модель или зоны посетителей.
-
----
-
-### ADR-010: Контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod; сервер по контракту
-
-**Status:** Accepted **Drives:** FR-001…FR-007, NFR-003, NFR-005, ограничение ТЗ
-
-**Context:** ТЗ проекта требует: TypeSpec-контракт, сгенерированную
-OpenAPI-спецификацию и клиентский SDK для фронтенда; серверные типы и
-маршруты генерируются, если фреймворк это поддерживает. Для Next.js App
-Router поддерживаемой серверной кодогенерации из OpenAPI нет — по ТЗ сервер
-реализуется по контракту и проверяется тестами. Архитектура в ред. 1.0
-допускала чтение данных UI-слоем напрямую из доменных модулей (ADR-004) и
-hand-written Zod-схемы (ADR-005) — оба решения обходили контракт и этим
-поправлены.
-
-**Decision:**
-
-- Единственный источник истины API — TypeSpec-контракт в каталоге
-  `contract/`: модели ресурсов `slots`/`bookings`, конверт ошибок (ADR-005),
-  формат времени ISO-8601 UTC (ADR-009), параметр `view=free|all`.
-- `npm run contract:gen`: TypeSpec → `openapi.yaml` (`@typespec/openapi`) →
-  типы клиента (`openapi-typescript`) и рантайм `openapi-fetch` → Zod-схемы
-  (`openapi-zod-client`); артефакты в `src/generated/`.
-- Сгенерированные артефакты коммитятся. `make lint` включает `@redocly/cli`
-  lint спецификации и drift-check: регенерация + `git diff --exit-code`.
-- Весь UI — RSC и клиентские компоненты — обращается к API только через
-  сгенерированный SDK; RSC читает self-fetch'ем собственного API (страницы
-  динамические). Прямые импорты доменных модулей из UI-слоя запрещены.
-- `GET /api/v1/slots` поддерживает `view=free|all` (дефолт `free`); `all` —
-  все интервалы, включая забронированные и прошедшие, для админ-страницы
-  (FR-002).
-- `GET /api/health` в контракт не входит (инфраструктурный, без версии).
-- Сервер: Route Handlers реализуются вручную по контракту; integration-тесты
-  (шов 1) парсят тела ответов сгенерированными Zod-схемами — конформанс
-  контракту проверяется каждым тестом.
-- Zod: генерация из OpenAPI — дефолт; hand-written схема допустима рядом как
-  дополнение для field-level UX-сообщений (с пометкой источника).
-
-**Consequences — LOCKED for all stories:**
-
-- Easier: один источник правды API; UI физически не может обойти контракт;
-  конформанс сервера проверяется тестами почти бесплатно.
-- Accepted cost: ручная реализация сервера может дрейфовать от контракта —
-  ловится drift-check'ом и парсингом ответов в тестах; self-fetch в RSC
-  добавляет round-trip на рендер (незаметно при бюджете NFR-005 — 300 мс
-  p95, демо-нагрузка); в проекте появляется дополнительный тулчейн.
-  `openapi-zod-client` генерирует синтаксис Zod 3 (сам зависит от zod ^3),
-  поэтому runtime-зависимость — zod 3.x; переезд на Zod 4 — при поддержке
-  генератором.
-
-**Alternatives:** hand-written Zod как источник схемы (второй источник
-истины); NestJS + tsoa (контракт генерируется из кода — обратное
-направление); `@hey-api/openapi-ts`, orval (тяжелее связки
-openapi-typescript + openapi-fetch; orval тянет React Query, отвергнутый
-ADR-004).
-
-**Revisit when:** появится серверная кодогенерация из OpenAPI/TypeSpec для
-Next.js App Router или второй клиент фронтенда.
+>
+> **Источник истины — файлы каталога [`docs/adr/`](../docs/adr/README.md)**
+> (решение D11 карты #28): каждый ADR — отдельный файл `000N-slug.md`. Полные
+> тексты ADR-0001…0010 перенесены туда из этого раздела (2026-11-07) и здесь
+> не дублируются; новые ADR пишутся сразу файлами. Этот раздел — только
+> индекс. Однострочные сводки —
+> [`bmad-output/decision-log.md`](decision-log.md).
+
+| ADR      | Title                                                                          | Status                     | Файл                                                                                         |
+| -------- | ------------------------------------------------------------------------------ | -------------------------- | -------------------------------------------------------------------------------------------- |
+| ADR-0001 | REST + JSON API с префиксом `/api/v1`                                          | Accepted                   | [0001-rest-json-api.md](../docs/adr/0001-rest-json-api.md)                                   |
+| ADR-0002 | SQLite (WAL) через Prisma; файл БД в volume                                    | Accepted                   | [0002-sqlite-wal-prisma.md](../docs/adr/0002-sqlite-wal-prisma.md)                           |
+| ADR-0003 | Без аутентификации; single-owner модель                                        | Accepted                   | [0003-single-owner-no-auth.md](../docs/adr/0003-single-owner-no-auth.md)                     |
+| ADR-0004 | Server-authoritative state; без клиентского стора                              | Accepted (amended by 0010) | [0004-server-authoritative-state.md](../docs/adr/0004-server-authoritative-state.md)         |
+| ADR-0005 | Конверт ошибок и ответов API                                                   | Accepted (amended by 0010) | [0005-api-error-envelope.md](../docs/adr/0005-api-error-envelope.md)                         |
+| ADR-0006 | Naming conventions (URL/JSON/DB/TS/UI)                                         | Accepted                   | [0006-naming-conventions.md](../docs/adr/0006-naming-conventions.md)                         |
+| ADR-0007 | Один Docker-образ: multi-stage, non-root, volume, healthcheck; Makefile для CI | Accepted                   | [0007-single-docker-image.md](../docs/adr/0007-single-docker-image.md)                       |
+| ADR-0008 | Модель слотов: конкретные дискретные интервалы; 1 интервал = 1 звонок          | **Superseded by ADR-0011** | [0008-discrete-slots.md](../docs/adr/0008-discrete-slots.md)                                 |
+| ADR-0009 | Время: хранение и передача UTC, отображение в APP_TZ                           | Accepted                   | [0009-utc-app-tz-time.md](../docs/adr/0009-utc-app-tz-time.md)                               |
+| ADR-0010 | Контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod; сервер по контракту            | Accepted                   | [0010-contract-first-typespec.md](../docs/adr/0010-contract-first-typespec.md)               |
+| ADR-0011 | Вычисляемые слоты из типов событий и рабочих часов                             | Accepted                   | [0011-derived-slots-from-event-types.md](../docs/adr/0011-derived-slots-from-event-types.md) |
+
+Разделы §4–§6 ниже всё ещё описывают модель ADR-0008 и приводятся к модели
+ADR-0011 тикетами волны №2 (#32–#37); при противоречии побеждают файлы
+`docs/adr/` и аддендум спеки №1 (issue #1).
 
 ---
 
@@ -875,10 +538,11 @@ PostgreSQL в отдельном контейнере + N реплик Next.js �
 
 ### Document History
 
-| Version | Date       | Author              | Changes                                                                                                                  |
-| ------- | ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 1.0     | 2026-11-07 | Winston (Architect) | Initial architecture                                                                                                     |
-| 1.1     | 2026-11-07 | Grilling session    | ADR-010 (контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod); ADR-004/005 поправлены; `view=free\|all` в `GET /api/v1/slots` |
+| Version | Date       | Author                 | Changes                                                                                                                                                         |
+| ------- | ---------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0     | 2026-11-07 | Winston (Architect)    | Initial architecture                                                                                                                                            |
+| 1.1     | 2026-11-07 | Grilling session       | ADR-010 (контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod); ADR-004/005 поправлены; `view=free\|all` в `GET /api/v1/slots`                                        |
+| 1.2     | 2026-11-07 | Карта решений №2 (#28) | ADR разложены на файлы `docs/adr/` (D11); добавлен ADR-0011 «Вычисляемые слоты из типов событий и рабочих часов»; ADR-008 → Superseded by ADR-0011; §3 — индекс |
 
 ---
 
