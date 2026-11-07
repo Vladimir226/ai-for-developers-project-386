@@ -57,10 +57,15 @@ model Booking {
   /** Конец звонка (копия из слота), ISO-8601 UTC. */
   endsAt: utcDateTime;
   /** Имя бронирующего. */
+  @minLength(1)
+  @maxLength(100)
   bookerName: string;
   /** Контакт для связи (телефон/мессенджер/email). */
+  @minLength(5)
+  @maxLength(200)
   bookerContact: string;
   /** Комментарий к брони (необязателен). */
+  @maxLength(500)
   comment?: string;
   /** Момент создания брони, ISO-8601 UTC. */
   createdAt: utcDateTime;
@@ -77,10 +82,15 @@ model CreateBookingRequest {
   @format("uuid")
   slotId: string;
   /** Имя бронирующего. */
+  @minLength(1)
+  @maxLength(100)
   bookerName: string;
   /** Контакт для связи. */
+  @minLength(5)
+  @maxLength(200)
   bookerContact: string;
   /** Комментарий (необязателен). */
+  @maxLength(500)
   comment?: string;
 }
 

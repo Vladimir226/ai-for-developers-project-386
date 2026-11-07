@@ -8,6 +8,8 @@ import { schemas } from '@/generated/zod';
 
 const BASE = 'http://localhost:3000';
 
+export { BASE };
+
 /** Глушит JSON-строки запросов (NFR-006) — в тестах они не нужны. */
 export function silenceRequestLogs(): void {
   vi.spyOn(console, 'log').mockImplementation(() => {});

@@ -6,9 +6,9 @@ const Booking = z
     slotId: z.string().uuid(),
     startsAt: z.string().datetime({ offset: true }),
     endsAt: z.string().datetime({ offset: true }),
-    bookerName: z.string(),
-    bookerContact: z.string(),
-    comment: z.string().optional(),
+    bookerName: z.string().min(1).max(100),
+    bookerContact: z.string().min(5).max(200),
+    comment: z.string().max(500).optional(),
     createdAt: z.string().datetime({ offset: true }),
   })
   .passthrough();
@@ -16,9 +16,9 @@ const BookingList = z.object({ bookings: z.array(Booking) }).passthrough();
 const CreateBookingRequest = z
   .object({
     slotId: z.string().uuid(),
-    bookerName: z.string(),
-    bookerContact: z.string(),
-    comment: z.string().optional(),
+    bookerName: z.string().min(1).max(100),
+    bookerContact: z.string().min(5).max(200),
+    comment: z.string().max(500).optional(),
   })
   .passthrough();
 const BookingCreated = Booking;
