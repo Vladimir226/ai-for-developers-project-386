@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Мудборд C — Спокойный шалфей</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #faf9f6;
+        --surface: #ffffff;
+        --border: #e7e3da;
+        --ink: #37352f;
+        --muted: #8a857b;
+        --accent: #5f8575;
+        --accent-soft: #edf3f0;
+        --ok: #5f8575;
+        --ok-soft: #edf3f0;
+        --err: #c4714b;
+        --err-soft: #faf1ec;
+        --radius: 12px;
+        --shadow: 0 1px 3px rgba(55, 53, 47, 0.04);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        width: 1600px;
+        height: 1000px;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: 'Manrope', sans-serif;
+        display: flex;
+        flex-direction: column;
+        padding: 56px 64px;
+        overflow: hidden;
+      }
+      .kicker {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .title {
+        font-size: 40px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin-top: 10px;
+      }
+      .title small {
+        font-weight: 500;
+        color: var(--muted);
+        font-size: 22px;
+      }
+      .keywords {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .keywords span {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--muted);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 14px;
+      }
+      main {
+        display: flex;
+        gap: 32px;
+        margin-top: 36px;
+        flex: 1;
+        min-height: 0;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .col-l {
+        width: 520px;
+      }
+      .col-r {
+        flex: 1;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+      }
+      .card h3 {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 18px;
+      }
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+      .sw {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .sw i {
+        display: block;
+        height: 64px;
+      }
+      .sw b {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 8px 10px 2px;
+      }
+      .sw em {
+        display: block;
+        font-size: 11px;
+        font-style: normal;
+        color: var(--muted);
+        padding: 0 10px 9px;
+        font-variant-numeric: tabular-nums;
+      }
+      .type h1 {
+        font-size: 46px;
+        font-weight: 700;
+        line-height: 1.08;
+      }
+      .type p {
+        font-size: 16px;
+        color: var(--muted);
+        margin-top: 10px;
+        line-height: 1.55;
+        max-width: 44ch;
+      }
+      .type .row {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+      .type .row b {
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .type .row span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .date {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .date b {
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .date span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .slots {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .slot {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 8px;
+        text-align: center;
+        background: var(--surface);
+      }
+      .slot b {
+        display: block;
+        font-size: 15px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .slot em {
+        display: block;
+        font-style: normal;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ok);
+        background: var(--ok-soft);
+        border-radius: 999px;
+        padding: 3px 8px;
+        margin-top: 6px;
+      }
+      .slot.sel {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .slot.sel em {
+        color: var(--accent);
+      }
+      .uirow {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 20px;
+      }
+      .btn {
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: var(--radius);
+        padding: 12px 22px;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn.ghost {
+        border: 1px solid var(--border);
+        color: var(--ink);
+        background: var(--surface);
+      }
+      .cal {
+        display: grid;
+        grid-template-columns: repeat(7, 44px);
+        gap: 6px;
+        margin-top: 20px;
+      }
+      .cal u {
+        text-decoration: none;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-align: center;
+        padding: 4px 0;
+      }
+      .cal i {
+        font-style: normal;
+        font-size: 13px;
+        font-weight: 500;
+        text-align: center;
+        border-radius: 50%;
+        padding: 9px 0;
+        border: 1px solid transparent;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      .cal i.off {
+        color: #d6d1c6;
+      }
+      .cal i.has {
+        border-color: var(--border);
+      }
+      .cal i.on {
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+      }
+      .form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .field label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .field div {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 11px 14px;
+        font-size: 14px;
+        color: var(--ink);
+      }
+      .field div.ph {
+        color: #b7b1a4;
+      }
+      .alert {
+        margin-top: 20px;
+        border: 1px solid #e8cdbe;
+        background: var(--err-soft);
+        border-radius: var(--radius);
+        padding: 12px 16px;
+        font-size: 13.5px;
+        color: #9a5432;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        line-height: 1.45;
+      }
+      .alert b {
+        font-weight: 700;
+      }
+      footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 26px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+      }
+      footer span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      footer b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="kicker">Направление C</div>
+      <h1 class="title">Спокойный шалфей <small>— тёплая бумага, мягкий акцент</small></h1>
+      <div class="keywords">
+        <span>спокойно</span><span>воздух</span><span>тёплые нейтрали</span><span>круглые даты</span
+        ><span>тонкие линии</span>
+      </div>
+    </header>
+    <main>
+      <div class="col col-l">
+        <section class="card">
+          <h3>Палитра</h3>
+          <div class="swatches">
+            <div class="sw"><i style="background: #faf9f6"></i><b>Фон</b><em>#FAF9F6</em></div>
+            <div class="sw">
+              <i style="background: #ffffff; border-bottom: 1px solid #e7e3da"></i><b>Карточки</b
+              ><em>#FFFFFF</em>
+            </div>
+            <div class="sw"><i style="background: #e7e3da"></i><b>Линии</b><em>#E7E3DA</em></div>
+            <div class="sw"><i style="background: #5f8575"></i><b>Акцент</b><em>#5F8575</em></div>
+            <div class="sw"><i style="background: #37352f"></i><b>Текст</b><em>#37352F</em></div>
+            <div class="sw"><i style="background: #c4714b"></i><b>Ошибка</b><em>#C4714B</em></div>
+          </div>
+        </section>
+        <section class="card type">
+          <h3>Типографика — Manrope</h3>
+          <h1>Запись на звонок</h1>
+          <p>
+            Гуманистический гротеск. Средние веса, свободный интерлиньяж, «бумажный» тёплый серый
+            вместо чёрного.
+          </p>
+          <div class="row">
+            <b>09:00 – 09:30</b
+            ><span>/ 15px SemiBold, tabular nums — времена всегда моноширинные</span>
+          </div>
+          <div class="row"><b>Свободно</b><span>/ 11px SemiBold в пилюле — статус слота</span></div>
+        </section>
+      </div>
+      <div class="col col-r">
+        <section class="card">
+          <h3>Плотность и фрагменты UI — публичная страница</h3>
+          <div class="date"><b>суббота, 28 ноября</b><span>время указано в MSK (UTC+3)</span></div>
+          <div class="slots">
+            <div class="slot"><b>09:00</b><em>Свободно</em></div>
+            <div class="slot sel"><b>09:30</b><em>Выбрано</em></div>
+            <div class="slot"><b>10:00</b><em>Свободно</em></div>
+            <div class="slot"><b>10:30</b><em>Свободно</em></div>
+          </div>
+          <div class="cal">
+            <u>пн</u><u>вт</u><u>ср</u><u>чт</u><u>пт</u><u>сб</u><u>вс</u> <i class="off">23</i
+            ><i class="off">24</i><i class="off">25</i><i class="off">26</i><i class="off">27</i
+            ><i class="has">28</i><i class="has">29</i> <i class="has">30</i><i class="off">1</i
+            ><i class="off">2</i><i class="off">3</i><i class="off">4</i><i class="has">5</i
+            ><i class="has">6</i> <i class="has">7</i><i class="off">8</i><i class="off">9</i
+            ><i class="off">10</i><i class="off">11</i><i class="on">12</i><i class="has">13</i>
+          </div>
+          <div class="form">
+            <div class="field">
+              <label>Имя</label>
+              <div>Мария Иванова</div>
+            </div>
+            <div class="field">
+              <label>Телефон или email</label>
+              <div class="ph">+7 900 000-00-00</div>
+            </div>
+          </div>
+          <div class="uirow">
+            <span class="btn primary">Забронировать звонок</span>
+            <span class="btn ghost">Изменить время</span>
+          </div>
+          <div class="alert">
+            <span>⚠</span
+            ><span
+              ><b>Этот слот только что заняли.</b> Выберите другое время — свободные
+              обновлены.</span
+            >
+          </div>
+        </section>
+      </div>
+    </main>
+    <footer>
+      <span
+        >Радиусы <b>12px, круглые даты</b> · тени <b>почти нет</b> · плотность <b>воздушная</b> (шаг
+        сетки 12–14px)</span
+      >
+      <span>Мудборд C · «Запись на звонок»</span>
+    </footer>
+  </body>
+</html>
