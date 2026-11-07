@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { createServerApiClient } from '@/lib/sdk/server';
 import { getAppTz } from '@/lib/time/app-tz';
 import { tzLabel } from '@/lib/time/display';
+import { UPCOMING_BOOKINGS_QUERY } from './admin-logic';
+import { BookingsList } from './BookingsList';
 import { EventTypeForm } from './EventTypeForm';
 import { EventTypeList } from './EventTypeList';
 import { WorkingHoursForm } from './WorkingHoursForm';
@@ -10,7 +12,8 @@ import { WorkingHoursForm } from './WorkingHoursForm';
 // Панель владельца (#34): типы событий (CRUD, каскадное удаление D4) и
 // рабочие часы недели (D3). Чтение — RSC self-fetch через SDK (ADR-004,
 // ADR-010), мутации — клиентские компоненты тем же SDK + router.refresh().
-// Брони — плейсхолдер до #36. Рабочие часы — «настенное» время APP_TZ
+// Брони (#36) — только предстоящие (?upcoming=true: фильтр «конец ≥
+// сейчас» делает сервер). Рабочие часы — «настенное» время APP_TZ
 // (ADR-009), в контракт уходят минуты от полуночи.
 
 export const dynamic = 'force-dynamic';
@@ -25,15 +28,17 @@ export default async function AdminPage() {
   const tzText = tzLabel(appTz, now);
 
   const api = await createServerApiClient();
-  const [eventTypesResult, hoursResult] = await Promise.all([
+  const [eventTypesResult, hoursResult, bookingsResult] = await Promise.all([
     api.GET('/api/v1/event-types'),
     api.GET('/api/v1/working-hours'),
+    api.GET('/api/v1/bookings', UPCOMING_BOOKINGS_QUERY),
   ]);
 
   // self-fetch того же процесса падает только вместе со всей страницей;
   // при частичном отказе каждая секция деградирует без своих данных
   const eventTypes = eventTypesResult.data?.eventTypes ?? null;
   const workingDays = hoursResult.data?.days ?? null;
+  const bookings = bookingsResult.data?.bookings ?? null;
 
   return (
     <div className="bg-paper text-ink font-sans antialiased min-h-screen flex flex-col">
@@ -111,15 +116,8 @@ export default async function AdminPage() {
           </div>
         </section>
 
-        {/* TODO(#36): список броней владельца и отмена (GET/DELETE /api/v1/bookings). */}
-        <section aria-label="Брони" className="mt-10">
-          <div className="rounded-2xl border border-line bg-card px-6 py-10 text-center shadow-[0_1px_3px_rgba(55,53,47,0.04)]">
-            <h2 className="text-[19px] font-bold tracking-tight">Брони</h2>
-            <p className="mt-2 text-[14px] leading-relaxed text-muted max-w-[52ch] mx-auto">
-              Список предстоящих броней всех типов и отмена появятся здесь в ближайшем обновлении.
-            </p>
-          </div>
-        </section>
+        {/* Список предстоящих броней всех типов + отмена — #36 */}
+        <BookingsList bookings={bookings} timeZone={appTz} tzText={tzText} />
       </main>
 
       <footer className="border-t border-line">

@@ -2,7 +2,11 @@
 // Право veto остаётся за сервером: локальные проверки формы только объясняют
 // пользователю состояние до отправки, а серверные 422 маппятся в те же ключи
 // полей (ADR-005). Рабочие часы — «настенное» время APP_TZ (ADR-009), в контракт
-// уходят минуты от полуночи (D3).
+// уходят минуты от полуночи (D3). Брони (#36): карточки предстоящих —
+// фильтр «конец ≥ сейчас» делает сервер (?upcoming=true), диапазон
+// форматируется здесь же на сервере в APP_TZ (ADR-0009).
+
+import { formatInterval } from '@/lib/time/display';
 
 /** Ошибки полей: ключи — имена полей формы (совпадают с полями конверта). */
 export type FieldErrors = Record<string, string>;
@@ -317,4 +321,64 @@ export function splitIssues(
     }
   }
   return { fieldErrors, otherMessages };
+}
+
+// ── Брони: список предстоящих (#36) ──────────────────────────────────────────
+
+/** Бронь в JSON-форме контракта (GET /api/v1/bookings, models.tsp Booking). */
+export interface BookingJson {
+  id: string;
+  eventType: { id: string; title: string; durationMinutes: number };
+  startsAt: string;
+  endsAt: string;
+  bookerName: string;
+  bookerContact: string;
+  comment?: string;
+  createdAt: string;
+}
+
+/**
+ * Параметры GET для секции «Брони»: только предстоящие (конец ≥ сейчас).
+ * Фильтр — серверный; UI повторно не фильтрует (ADR-004: сервер — истина).
+ */
+export const UPCOMING_BOOKINGS_QUERY = { query: { upcoming: true } } as const;
+
+/** Карточка брони: всё готово к рендеру, клиентский компонент не вычисляет. */
+export interface BookingCardData {
+  id: string;
+  eventTypeTitle: string;
+  durationLabel: string;
+  when: string;
+  bookerName: string;
+  bookerContact: string;
+  comment?: string;
+}
+
+/**
+ * Бронь → карточка секции «Брони»: тип встречи, длительность («30 минут»)
+ * и диапазон «вт, 10 ноября · 10:00–10:30» в зоне APP_TZ — форматирование
+ * только на сервере (ADR-0009), клиент зоны не преобразует.
+ */
+export function bookingCardFromBooking(booking: BookingJson, timeZone: string): BookingCardData {
+  const card: BookingCardData = {
+    id: booking.id,
+    eventTypeTitle: booking.eventType.title,
+    durationLabel: formatDuration(booking.eventType.durationMinutes),
+    when: formatInterval(booking.startsAt, booking.endsAt, timeZone),
+    bookerName: booking.bookerName,
+    bookerContact: booking.bookerContact,
+  };
+  if (booking.comment !== undefined) card.comment = booking.comment;
+  return card;
+}
+
+/**
+ * Итог неудачной отмены для карточки: null — молча (404: бронь уже исчезла,
+ * например отменена в другом окне, — карточку уберёт router.refresh),
+ * строка — общее сообщение. 422/409 для DELETE не ожидаемы по контракту,
+ * но любой конверт разбирается без падения (failureFromApiError, ADR-0005).
+ */
+export function cancelFailureNotice(failure: MutationFailure): string | null {
+  if (failure.kind === 'notFound') return null;
+  return 'не удалось отменить бронь — попробуйте ещё раз';
 }
