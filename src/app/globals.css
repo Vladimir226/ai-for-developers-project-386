@@ -64,6 +64,12 @@ body {
   border-color: var(--color-clay);
 }
 
+/* подсветка полей с серверными/локальными ошибками (панель #34): форма
+   с noValidate не получает :user-invalid, поэтому класс ставит компонент */
+.field.field-invalid {
+  border-color: var(--color-clay);
+}
+
 /*
  * Календарь и кнопки окон публичной страницы — перенос из прототипа
  * docs/design/prototype/index.html (#13); цвета — токены направления C.
