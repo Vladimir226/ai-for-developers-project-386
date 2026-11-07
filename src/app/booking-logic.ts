@@ -105,6 +105,12 @@ function nextMonthKey(monthKey: string): string {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
 }
 
+function nextDayKey(dateKey: string): string {
+  const { year, monthIndex, day } = parseKey(dateKey);
+  const d = new Date(Date.UTC(year, monthIndex, day + 1));
+  return utcKey(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
 /** Сетка месяца: 42 клетки с понедельника перед 1-м числом (макет #13). */
 function monthCells(
   monthKey: string,
@@ -156,9 +162,15 @@ export function buildBookingCalendar(
   const windowEndKey = utcKey(year, monthIndex, day + BOOKING_WINDOW_DAYS);
 
   const days: Record<string, CalendarDay> = {};
+  // Дни окна предсоздаются пустыми: карточка дня знает своё название даже
+  // без окон («На этот день свободных окон нет»), заголовок не теряется
+  for (let key = todayKey; key <= windowEndKey; key = nextDayKey(key)) {
+    days[key] = { dateKey: key, title: dayTitle(key), slots: [] };
+  }
   for (const s of slots) {
     const dateKey = wallDateKey(new Date(s.startsAt), appTz);
-    const calendarDay = (days[dateKey] ??= { dateKey, title: dayTitle(dateKey), slots: [] });
+    const calendarDay = days[dateKey];
+    if (!calendarDay) continue; // слот за пределами окна — не показываем
     calendarDay.slots.push({
       id: s.id,
       startsAt: s.startsAt,

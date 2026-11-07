@@ -55,7 +55,16 @@ describe('buildBookingCalendar', () => {
       MSK,
       NOW,
     );
-    expect(Object.keys(cal2.days)).toEqual(['2026-11-11']);
+    const withSlots = Object.entries(cal2.days).filter(([, d]) => d.slots.length > 0);
+    expect(withSlots.map(([key]) => key)).toEqual(['2026-11-11']);
+  });
+
+  it('дни окна без окон тоже имеют заголовок — карточка дня не теряет название', () => {
+    expect(cal.days['2026-11-09']).toEqual({
+      dateKey: '2026-11-09',
+      title: 'понедельник, 9 ноября',
+      slots: [],
+    });
   });
 
   it('сетка месяца: 42 клетки, неделя с понедельника, чужие месяцы — off', () => {
@@ -91,7 +100,9 @@ describe('buildBookingCalendar', () => {
 
   it('без слотов месяцы и сетки остаются, открытых дней нет', () => {
     const empty = buildBookingCalendar([], MSK, NOW);
-    expect(Object.keys(empty.days)).toEqual([]);
+    // дни окна предсозданы пустыми — карточка дня знает своё название
+    expect(Object.keys(empty.days)).toHaveLength(32); // 2026-11-07 … 2026-12-08
+    expect(Object.values(empty.days).every((d) => d.slots.length === 0)).toBe(true);
     expect(empty.months.map((m) => m.key)).toEqual(['2026-11', '2026-12']);
     expect(empty.months.every((m) => m.cells.every((c) => c.state !== 'open'))).toBe(true);
   });
