@@ -1,0 +1,32 @@
+# Контекст сборки Docker-образа (ADR-007): в образ не попадают
+# dev-артефакты, секреты и локальная БД.
+
+# vcs
+.git
+.github
+
+# зависимости и сборочные артефакты (воспроизводятся внутри стейджей)
+node_modules
+.next
+out
+coverage
+*.tsbuildinfo
+
+# секреты: в образе их быть не должно (NFR-007)
+.env
+.env.*
+!.env.example
+
+# локальная БД разработки (ADR-002)
+dev-data
+
+# не нужны для сборки приложения
+docs
+bmad-output
+.agents
+contract
+README.md
+Makefile
+AGENTS.md
+GLOSSARY.md
+skills-lock.json
