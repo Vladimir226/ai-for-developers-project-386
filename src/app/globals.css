@@ -54,3 +54,117 @@ body {
 .field:user-invalid {
   border-color: var(--color-clay);
 }
+
+/*
+ * Календарь и кнопки окон публичной страницы — перенос из прототипа
+ * docs/design/prototype/index.html (#13); цвета — токены направления C.
+ * #d6d1c6 — литерал прототипа (числа выключенных дней), токена нет.
+ */
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 7px 2px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.cal-day b {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.cal-day .cal-count {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-sage);
+  line-height: 1;
+  min-height: 13px;
+}
+.cal-day:hover {
+  border-color: var(--color-sage);
+}
+.cal-day.zero .cal-count {
+  color: var(--color-faint);
+}
+.cal-day.off {
+  cursor: default;
+  color: #d6d1c6;
+}
+.cal-day.off b {
+  color: #d6d1c6;
+}
+.cal-day.off .cal-count {
+  visibility: hidden;
+}
+.cal-day.off:hover {
+  border-color: transparent;
+}
+.cal-day.on {
+  background: var(--color-sage);
+  border-color: var(--color-sage);
+}
+.cal-day.on b {
+  color: var(--color-card);
+}
+.cal-day.on .cal-count {
+  color: rgba(255, 255, 255, 0.85);
+}
+.cal-day.today b {
+  position: relative;
+}
+.cal-day.today b::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-sage);
+}
+.cal-day.on.today b::after {
+  background: var(--color-card);
+}
+
+/* пустое состояние: календарь без единого свободного окна (прототип #13) */
+.cal-empty .cal-day {
+  pointer-events: none;
+}
+.cal-empty .cal-day:not(.off) b {
+  color: var(--color-faint);
+}
+.cal-empty .cal-count {
+  visibility: hidden;
+}
+
+/* кнопка окна дня из прототипа index.html (#13) */
+.slot-btn {
+  border: 1px solid var(--color-line);
+  background: var(--color-card);
+  border-radius: 12px;
+  padding: 11px 10px;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: center;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+  cursor: pointer;
+  width: 100%;
+}
+.slot-btn:hover {
+  border-color: var(--color-sage);
+}
+.slot-btn.slot-on {
+  border-color: var(--color-sage);
+  background: var(--color-sage-soft);
+  box-shadow: 0 0 0 1px var(--color-sage) inset;
+}
