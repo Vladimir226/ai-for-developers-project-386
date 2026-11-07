@@ -1,6 +1,6 @@
 # System Architecture: «Запись на звонок» (Book-a-Call)
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Date:** 2026-11-07
 **Author:** Winston (Architect)
 **Track:** BMad Method
@@ -77,6 +77,11 @@ NFR, которые сильнее всего давят на дизайн:
 - **Existing constraints:**
   - Обязательный CI `.github/workflows/hexlet-check.yml` — не удалять,
     не переименовывать, не редактировать (PRD, ограничение репозитория).
+  - ТЗ проекта: работа с API — контракт-фёрст. Обязательны TypeSpec-контракт,
+    сгенерированная OpenAPI-спецификация и клиентский SDK для фронтенда;
+    серверные типы/маршруты генерируются, если фреймворк поддерживает
+    (для Next.js App Router — нет), иначе сервер реализуется по контракту
+    и проверяется тестами (ADR-010).
   - Стек свободный; результат: сборка в Docker-образ, запуск в контейнере.
 
 ---
@@ -104,11 +109,14 @@ NFR, которые сильнее всего давят на дизайн:
 - **Serverless:** отвергнуто — противоречит NFR-001 (запуск в собственном
   контейнере).
 
-**Application:** единое Next.js-приложение (App Router). Чтение данных —
-React Server Components напрямую из слоя домена; мутации — Route Handlers
-`/api/v1/*`, которые параллельно являются публичным API. Домен разделён на два
-модуля: `availability` (интервалы) и `bookings` (брони). Персистентность —
-Prisma + SQLite.
+**Application:** единое Next.js-приложение (App Router). API описывается
+TypeSpec-контрактом (ADR-010); из него генерируются OpenAPI-спецификация,
+клиентский SDK и Zod-схемы. Всё чтение данных (включая React Server
+Components — self-fetch собственного API) и все мутации идут только через
+сгенерированный SDK; прямые импорты доменных модулей из UI-слоя запрещены.
+Мутации выполняют Route Handlers `/api/v1/*`, которые одновременно являются
+публичным API. Домен разделён на два модуля: `availability` (интервалы) и
+`bookings` (брони). Персистентность — Prisma + SQLite.
 
 ---
 
@@ -128,6 +136,7 @@ Prisma + SQLite.
 | ADR-007 | Один Docker-образ: multi-stage, non-root, volume, healthcheck; Makefile для CI | Accepted | NFR-001, NFR-008, NFR-009 |
 | ADR-008 | Модель слотов: конкретные дискретные интервалы; 1 интервал = 1 звонок | Accepted | FR-001, FR-004, FR-005 |
 | ADR-009 | Время: хранение и передача UTC, отображение в APP_TZ | Accepted | FR-003, NFR-004 |
+| ADR-010 | Контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod; сервер по контракту | Accepted | FR-001…007, NFR-003, NFR-005, ТЗ |
 
 ### ADR-001: REST + JSON API с префиксом `/api/v1`
 
@@ -211,18 +220,20 @@ Prisma ORM (provider `sqlite`). Файл БД живёт в каталоге `/d
 
 ### ADR-004: Server-authoritative state; без клиентского стора
 
-**Status:** Accepted  **Drives:** FR-003, FR-006, NFR-003
+**Status:** Accepted (amended by ADR-010)  **Drives:** FR-003, FR-006, NFR-003
 
 **Context:** Состояние системы — интервалы и брони — целиком живёт на сервере.
 Клиенту нужен только локальный UI-state (открытая форма, выбранный слот).
 Введение Redux/Zustand без серверного состояния — церемония без выгоды.
 
-**Decision:** Сервер — единственный источник истины. Чтение — React Server
-Components (прямой запрос к слою домена, без клиентского fetch, где возможно).
-Мутации — клиент вызывает Route Handlers через `fetch`, затем
-`router.refresh()` для ре-рендера серверных данных. Клиентский стор
-(Redux/Zustand) не вводится; локальный UI-state — `useState`/`useOptimistic`.
-Таймзонные преобразования для отображения — на сервере (ADR-009).
+**Decision (поправлено ADR-010):** Сервер — единственный источник истины.
+Чтение — React Server Components через сгенерированный SDK (self-fetch
+собственного API `/api/v1/*`, страницы динамические); мутации — вызовы Route
+Handlers тем же SDK, затем `router.refresh()` для ре-рендера серверных
+данных. Прямые импорты доменных модулей из UI-слоя запрещены. Клиентский
+стор (Redux/Zustand) не вводится; локальный UI-state —
+`useState`/`useOptimistic`. Таймзонные преобразования для отображения — на
+сервере (ADR-009).
 
 **Consequences — LOCKED for all stories:**
 - Easier: нет рассинхронизации кэшей; один паттерн обновления данных для всех
@@ -240,7 +251,7 @@ React Query/SWR поверх RSC (дублирует серверное чтен
 
 ### ADR-005: Конверт ошибок и ответов API
 
-**Status:** Accepted  **Drives:** NFR-005, NFR-007
+**Status:** Accepted (amended by ADR-010)  **Drives:** NFR-005, NFR-007
 
 **Context:** Клиент и e2e-тесты должны одинаково интерпретировать любую ошибку.
 Без зафиксированной формы каждый агент изобретёт свой формат.
@@ -254,7 +265,9 @@ React Query/SWR поверх RSC (дублирует серверное чтен
   список `field`/`message`); `500` — непредвиденная ошибка сервера.
 - `error.code` — SCREAMING_SNAKE_CASE, стабильный машинный контракт
   (`SLOT_ALREADY_BOOKED`, `SLOT_OVERLAP`, `VALIDATION_ERROR`, `NOT_FOUND`).
-- Валидация тела — Zod-схемы, единые для клиента и сервера.
+- Валидация тела — Zod-схемы, генерируемые из OpenAPI-контракта (ADR-010);
+  hand-written схемы допустимы только как дополнение для field-level
+  UX-сообщений и помечаются источником.
 
 **Consequences — LOCKED for all stories:** все Route Handlers возвращают
 исключительно эти формы; клиентская обработка ошибок — только по `error.code`.
@@ -396,6 +409,60 @@ Zod принимает только ISO 8601 со смещением/Z и нор
 
 ---
 
+### ADR-010: Контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod; сервер по контракту
+
+**Status:** Accepted  **Drives:** FR-001…FR-007, NFR-003, NFR-005, ограничение ТЗ
+
+**Context:** ТЗ проекта требует: TypeSpec-контракт, сгенерированную
+OpenAPI-спецификацию и клиентский SDK для фронтенда; серверные типы и
+маршруты генерируются, если фреймворк это поддерживает. Для Next.js App
+Router поддерживаемой серверной кодогенерации из OpenAPI нет — по ТЗ сервер
+реализуется по контракту и проверяется тестами. Архитектура в ред. 1.0
+допускала чтение данных UI-слоем напрямую из доменных модулей (ADR-004) и
+hand-written Zod-схемы (ADR-005) — оба решения обходили контракт и этим
+поправлены.
+
+**Decision:**
+- Единственный источник истины API — TypeSpec-контракт в каталоге
+  `contract/`: модели ресурсов `slots`/`bookings`, конверт ошибок (ADR-005),
+  формат времени ISO-8601 UTC (ADR-009), параметр `view=free|all`.
+- `npm run contract:gen`: TypeSpec → `openapi.yaml` (`@typespec/openapi`) →
+  типы клиента (`openapi-typescript`) и рантайм `openapi-fetch` → Zod-схемы
+  (`openapi-zod-client`); артефакты в `src/generated/`.
+- Сгенерированные артефакты коммитятся. `make lint` включает `@redocly/cli`
+  lint спецификации и drift-check: регенерация + `git diff --exit-code`.
+- Весь UI — RSC и клиентские компоненты — обращается к API только через
+  сгенерированный SDK; RSC читает self-fetch'ем собственного API (страницы
+  динамические). Прямые импорты доменных модулей из UI-слоя запрещены.
+- `GET /api/v1/slots` поддерживает `view=free|all` (дефолт `free`); `all` —
+  все интервалы, включая забронированные и прошедшие, для админ-страницы
+  (FR-002).
+- `GET /api/health` в контракт не входит (инфраструктурный, без версии).
+- Сервер: Route Handlers реализуются вручную по контракту; integration-тесты
+  (шов 1) парсят тела ответов сгенерированными Zod-схемами — конформанс
+  контракту проверяется каждым тестом.
+- Zod: генерация из OpenAPI — дефолт; hand-written схема допустима рядом как
+  дополнение для field-level UX-сообщений (с пометкой источника).
+
+**Consequences — LOCKED for all stories:**
+- Easier: один источник правды API; UI физически не может обойти контракт;
+  конформанс сервера проверяется тестами почти бесплатно.
+- Accepted cost: ручная реализация сервера может дрейфовать от контракта —
+  ловится drift-check'ом и парсингом ответов в тестах; self-fetch в RSC
+  добавляет round-trip на рендер (незаметно при бюджете NFR-005 — 300 мс
+  p95, демо-нагрузка); в проекте появляется дополнительный тулчейн.
+
+**Alternatives:** hand-written Zod как источник схемы (второй источник
+истины); NestJS + tsoa (контракт генерируется из кода — обратное
+направление); `@hey-api/openapi-ts`, orval (тяжелее связки
+openapi-typescript + openapi-fetch; orval тянет React Query, отвергнутый
+ADR-004).
+
+**Revisit when:** появится серверная кодогенерация из OpenAPI/TypeSpec для
+Next.js App Router или второй клиент фронтенда.
+
+---
+
 ## 4. Component Design
 
 ### Component Overview
@@ -418,8 +485,9 @@ Zod принимает только ISO 8601 со смещением/Z и нор
 │  └─ bookings     — бронирование (транзакция + констрейнт), отмена, список           │
 │                                                                                     │
 │  Infrastructure Layer                                                               │
+│  ├─ contract/ (TypeSpec) → src/generated/ — OpenAPI, SDK, Zod (ADR-010)             │
 │  ├─ Prisma Client (SQLite, WAL; /data/app.db)                                       │
-│  ├─ lib/validation  — Zod-схемы (общие для клиента и сервера)                       │
+│  ├─ lib/validation  — Zod-схемы из OpenAPI-контракта (ADR-005, ADR-010)             │
 │  ├─ lib/http        — helpers ответов/ошибок (ADR-005), request-id                  │
 │  └─ lib/logger      — структурные JSON-логи (NFR-006)                               │
 └─────────────────────────────────────────────────────────────────────────────────────┘
@@ -530,11 +598,15 @@ Zod принимает только ISO 8601 со смещением/Z и нор
 **Protocol:** REST + JSON (ADR-001)  **AuthN:** отсутствует (ADR-003)
 **Versioning:** префикс `/api/v1`; ломающие изменения — новый префикс.
 
-### `GET /api/v1/slots?from=<ISO>&to=<ISO>`
+### `GET /api/v1/slots?from=<ISO>&to=<ISO>&view=free|all`
 
-**Purpose:** свободные будущие слоты периода (публично)  **Auth:** None
-**Response 200:** `{"slots": [{ "id", "startsAt", "endsAt" }]}` — только слоты
-без активной брони; `from`/`to` опциональны (по умолчанию `[now; now+31d]`).
+**Purpose:** слоты периода. Публичная страница использует `view=free`
+(дефолт), админ-страница — `view=all` (FR-002)  **Auth:** None
+**Response 200:** `{"slots": [{ "id", "startsAt", "endsAt" }]}` — при
+`view=free` только слоты без активной брони, целиком в будущем; при
+`view=all` — все интервалы, включая забронированные и прошедшие (какие
+забронированы, админ коррелирует с `GET /api/v1/bookings` по `slotId`).
+`from`/`to` опциональны (по умолчанию `[now; now+31d]`).
 **Errors:** 422 `VALIDATION_ERROR`
 **NFRs:** p95 < 300 мс (NFR-005)
 
@@ -633,7 +705,11 @@ Zod принимает только ISO 8601 со смещением/Z и нор
 | Language | TypeScript | 5.x | Один язык на стеке → выравнивание агентов (NFR-003) | ADR-004 |
 | Framework | Next.js (App Router) | 15.x | RSC-чтение + Route Handlers в одном артефакте → single image (NFR-001) | ADR-001, 004 |
 | Styling | TailwindCSS | 4.x | Быстрые UI-итерации, адаптив без кастомного CSS-слоя (NFR-004) | — |
-| Validation | Zod | 4.x | Общие схемы клиент+сервер → контракт валидации один (NFR-007) | ADR-005 |
+| Validation | Zod | 4.x | Схемы генерируются из OpenAPI — один источник валидации (NFR-007) | ADR-005, ADR-010 |
+| API contract | TypeSpec | latest | ТЗ: контракт — источник истины API | ADR-010 |
+| SDK codegen | openapi-typescript + openapi-fetch | latest | Типы + нативный fetch-клиент из OpenAPI (ТЗ) | ADR-010 |
+| Zod codegen | openapi-zod-client | latest | Zod-схемы из OpenAPI; конформанс в тестах | ADR-010 |
+| Spec lint | @redocly/cli | latest | Линт OpenAPI + drift-check в `make lint` | ADR-010 |
 | ORM | Prisma | 6.x | Типобезопасный доступ + миграции; единственный владелец схемы (NFR-003) | ADR-002 |
 | Database | SQLite (WAL) | встроенная | Нулевая конфигурация в контейнере (NFR-001, NFR-008) | ADR-002 |
 | Unit/API tests | Vitest | 3.x | Нативный TS, общий toolchain с Next (NFR-003) | — |
@@ -768,6 +844,7 @@ PostgreSQL в отдельном контейнере + N реплик Next.js �
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-11-07 | Winston (Architect) | Initial architecture |
+| 1.1 | 2026-11-07 | Grilling session | ADR-010 (контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod); ADR-004/005 поправлены; `view=free\|all` в `GET /api/v1/slots` |
 
 ---
 
