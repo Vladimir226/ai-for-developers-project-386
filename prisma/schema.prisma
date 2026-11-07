@@ -10,3 +10,16 @@ datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
+
+// Опубликованный интервал (ADR-008, ADR-009). id — UUID: контракт (#12)
+// требует @format("uuid") для API; расхождение со сводкой §5 (cuid) осознанно
+// решено в пользу контракта — ADR-010 делает его источником истины API.
+model Slot {
+  id        String   @id @default(uuid())
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime @map("ends_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([startsAt])
+  @@map("slots")
+}

@@ -577,7 +577,7 @@ Next.js App Router или второй клиент фронтенда.
 
 **Attributes:**
 
-- `id` (TEXT, PK, cuid)
+- `id` (TEXT, PK, UUID v4 — формат `@format("uuid")` из контракта #12; ADR-010 делает контракт источником истины API)
 - `starts_at` (TEXT ISO-8601 UTC) — начало звонка
 - `ends_at` (TEXT ISO-8601 UTC) — конец (эксклюзивно)
 - `created_at` (TEXT ISO-8601 UTC)
