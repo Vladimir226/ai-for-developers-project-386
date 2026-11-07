@@ -181,6 +181,24 @@ describe('GET /api/v1/slots', () => {
     ]);
   });
 
+  it('без параметров: слот дальше 14 дней за дефолтным окном не возвращается', async () => {
+    const beyond = await postSlot({
+      startsAt: futureIso(14 * 24 + 2),
+      endsAt: futureIso(14 * 24 + 3),
+    });
+    const within = await postSlot({ startsAt: futureIso(24), endsAt: futureIso(25) });
+    expect(beyond.status).toBe(201);
+    expect(within.status).toBe(201);
+    const beyondId = schemas.SlotCreated.parse(await beyond.json()).id;
+
+    const response = await getSlots();
+
+    expect(response.status).toBe(200);
+    const body = schemas.SlotList.parse(await response.json());
+    expect(body.slots.map((slot) => slot.id)).not.toContain(beyondId);
+    expect(body.slots).toHaveLength(1);
+  });
+
   it('view=all с явным окном возвращает и прошедшие интервалы', async () => {
     await seedPastSlot();
 

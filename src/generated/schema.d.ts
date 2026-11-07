@@ -330,7 +330,7 @@ export interface operations {
             query?: {
                 /** @description Начало периода (ISO-8601 UTC); по умолчанию — сейчас. */
                 from?: string;
-                /** @description Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 31 день. */
+                /** @description Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 14 дней (окно записи, макет #13). */
                 to?: string;
                 /** @description Режим выборки; по умолчанию `free`. */
                 view?: components["schemas"]["SlotView"];

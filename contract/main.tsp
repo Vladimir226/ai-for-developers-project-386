@@ -37,7 +37,7 @@ namespace BookACall;
 op listSlots(
   /** Начало периода (ISO-8601 UTC); по умолчанию — сейчас. */
   @query("from") from?: utcDateTime,
-  /** Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 31 день. */
+  /** Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 14 дней (окно записи, макет #13). */
   @query("to") to?: utcDateTime,
   /** Режим выборки; по умолчанию `free`. */
   @query("view") view?: SlotView = SlotView.free,

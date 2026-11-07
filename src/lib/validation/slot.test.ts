@@ -86,12 +86,12 @@ describe('parseCreateSlotBody', () => {
 });
 
 describe('parseSlotQuery', () => {
-  it('пустые параметры → дефолтное окно [now; now + 31 день], view=free', () => {
+  it('пустые параметры → дефолтное окно [now; now + 14 дней], view=free', () => {
     const result = parseSlotQuery({}, NOW);
 
     expect(result).toEqual({
       ok: true,
-      value: { from: NOW, to: new Date('2026-12-08T12:00:00.000Z'), view: 'free' },
+      value: { from: NOW, to: new Date('2026-11-21T12:00:00.000Z'), view: 'free' },
     });
   });
 

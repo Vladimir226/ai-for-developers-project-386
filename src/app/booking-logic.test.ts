@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseSlotQuery } from '@/lib/validation/slot';
 import {
   bookingBanner,
   bookingFailureFromApiError,
@@ -23,21 +24,21 @@ const SLOTS = [
   slot('s1', '2026-11-10T07:00:00Z', '2026-11-10T07:30:00Z'), // вт 10.11, 10:00–10:30 MSK
   slot('s2', '2026-11-10T07:30:00Z', '2026-11-10T08:00:00Z'), // вт 10.11, 10:30–11:00 MSK
   slot('s3', '2026-11-11T12:00:00Z', '2026-11-11T12:30:00Z'), // ср 11.11, 15:00–15:30 MSK
-  slot('s4', '2026-12-05T09:00:00Z', '2026-12-05T09:30:00Z'), // сб 5.12, 12:00–12:30 MSK
+  slot('s4', '2026-12-05T09:00:00Z', '2026-12-05T09:30:00Z'), // сб 5.12, 12:00–12:30 MSK — вне окна
+  slot('s5', '2026-11-20T09:00:00Z', '2026-11-20T09:30:00Z'), // пт 20.11, 12:00–12:30 MSK — последний день окна
 ];
 
 describe('buildBookingCalendar', () => {
   const cal = buildBookingCalendar(SLOTS, MSK, NOW);
 
-  it('окно — 31 день от сегодня (дефолт GET /api/v1/slots)', () => {
+  it('окно — 14 настенных дат включая сегодня (макет #13: 7→20 ноября)', () => {
     expect(cal.todayKey).toBe('2026-11-07');
-    expect(cal.windowEndKey).toBe('2026-12-08');
+    expect(cal.windowEndKey).toBe('2026-11-20');
   });
 
-  it('месяцы окна: ноябрь и декабрь, подписи — именительный падеж без «г.»', () => {
+  it('окно в одном месяце: только ноябрь, подпись — именительный падеж без «г.»', () => {
     expect(cal.months.map((m) => ({ key: m.key, label: m.label }))).toEqual([
       { key: '2026-11', label: 'ноябрь 2026' },
-      { key: '2026-12', label: 'декабрь 2026' },
     ]);
   });
 
@@ -46,7 +47,7 @@ describe('buildBookingCalendar', () => {
     expect(day.title).toBe('вторник, 10 ноября');
     expect(day.slots.map((s) => s.timeLabel)).toEqual(['10:00–10:30', '10:30–11:00']);
     expect(cal.days['2026-11-11'].title).toBe('среда, 11 ноября');
-    expect(cal.days['2026-12-05'].slots[0].timeLabel).toBe('12:00–12:30');
+    expect(cal.days['2026-11-20'].slots[0].timeLabel).toBe('12:00–12:30'); // последний день окна
   });
 
   it('UTC-полночь относится к следующей настенной дате MSK', () => {
@@ -79,7 +80,8 @@ describe('buildBookingCalendar', () => {
     expect(byKey.get('2026-11-06')?.state).toBe('off'); // вчера
     expect(byKey.get('2026-11-07')).toMatchObject({ state: 'zero', isToday: true });
     expect(byKey.get('2026-11-09')?.state).toBe('zero'); // завтра без окон
-    expect(byKey.get('2026-11-30')?.state).toBe('zero'); // последний день ноября — ещё в окне
+    expect(byKey.get('2026-11-19')?.state).toBe('zero'); // предпоследний день окна без окон
+    expect(byKey.get('2026-11-20')?.state).toBe('open'); // последний день окна — ещё в окне
   });
 
   it('день со слотами — open со счётчиком и aria-подписью', () => {
@@ -90,21 +92,31 @@ describe('buildBookingCalendar', () => {
     expect(zero?.label).toBe('понедельник, 9 ноября, свободных окон нет');
   });
 
-  it('второй месяц: окно до 8 декабря, 5-е открыто, 9-е и дальше — off', () => {
-    const byKey = new Map(cal.months[1].cells.map((c) => [c.dateKey, c]));
-    expect(byKey.get('2026-12-05')).toMatchObject({ state: 'open', count: 1 });
-    expect(byKey.get('2026-12-08')?.state).toBe('zero');
-    expect(byKey.get('2026-12-09')?.state).toBe('off');
-    expect(byKey.get('2026-12-31')?.state).toBe('off');
+  it('за пределами окна: 21 ноября и дальше — off, слот вне окна не показан', () => {
+    const byKey = new Map(cal.months[0].cells.map((c) => [c.dateKey, c]));
+    expect(byKey.get('2026-11-21')?.state).toBe('off'); // первый день за окном
+    expect(byKey.get('2026-11-30')?.state).toBe('off');
+    expect(byKey.get('2026-12-05')?.state).toBe('off'); // слот s4 есть, но окно кончилось
+    expect(cal.days['2026-12-05']).toBeUndefined();
   });
 
   it('без слотов месяцы и сетки остаются, открытых дней нет', () => {
     const empty = buildBookingCalendar([], MSK, NOW);
     // дни окна предсозданы пустыми — карточка дня знает своё название
-    expect(Object.keys(empty.days)).toHaveLength(32); // 2026-11-07 … 2026-12-08
+    expect(Object.keys(empty.days)).toHaveLength(14); // 2026-11-07 … 2026-11-20
     expect(Object.values(empty.days).every((d) => d.slots.length === 0)).toBe(true);
-    expect(empty.months.map((m) => m.key)).toEqual(['2026-11', '2026-12']);
+    expect(empty.months.map((m) => m.key)).toEqual(['2026-11']);
     expect(empty.months.every((m) => m.cells.every((c) => c.state !== 'open'))).toBe(true);
+  });
+
+  it('пиннинг: дефолт GET /api/v1/slots накрывает окно записи до конца суток', () => {
+    // связывает BOOKING_WINDOW_DAYS и DEFAULT_PERIOD_DAYS: расхождение
+    // (окно длиннее дефолта) молча оставило бы последние дни пустыми
+    const cal = buildBookingCalendar([], MSK, NOW);
+    const query = parseSlotQuery({}, NOW);
+    if (!query.ok) throw new Error('дефолтный запрос должен быть валиден');
+    const windowEndsAt = new Date(`${cal.windowEndKey}T23:59:59.999+03:00`); // конец суток в MSK
+    expect(windowEndsAt.getTime()).toBeLessThanOrEqual(query.value.to.getTime());
   });
 });
 

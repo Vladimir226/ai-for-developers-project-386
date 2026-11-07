@@ -7,8 +7,8 @@ import { formatTimeRange } from '@/lib/time/display';
 // только по error.code (ADR-005). Форматирование — на сервере: клиент получает
 // готовые подписи и не делает таймзонных преобразований.
 
-/** Дефолтное окно GET /api/v1/slots — сейчас + 31 день (контракт, main.tsp). */
-const BOOKING_WINDOW_DAYS = 31;
+/** Окно записи — 14 настенных дат, включая сегодня (макет #13). */
+const BOOKING_WINDOW_DAYS = 14;
 
 export interface CalendarSlot {
   id: string;
@@ -150,7 +150,8 @@ function monthCells(
 
 /**
  * Календарь публичной страницы из свободных слотов: группировка по дням
- * APP_TZ, сетки месяцев окна (сегодня + 31 день — дефолт выборки API).
+ * APP_TZ, сетки месяцев окна записи (14 настенных дат с сегодняшней —
+ * макет #13; дефолт выборки API покрывает окно целиком).
  */
 export function buildBookingCalendar(
   slots: readonly { id: string; startsAt: string; endsAt: string }[],
@@ -159,7 +160,8 @@ export function buildBookingCalendar(
 ): BookingCalendar {
   const todayKey = wallDateKey(now, appTz);
   const { year, monthIndex, day } = parseKey(todayKey);
-  const windowEndKey = utcKey(year, monthIndex, day + BOOKING_WINDOW_DAYS);
+  // −1: сегодня — первая из 14 дат окна
+  const windowEndKey = utcKey(year, monthIndex, day + BOOKING_WINDOW_DAYS - 1);
 
   const days: Record<string, CalendarDay> = {};
   // Дни окна предсоздаются пустыми: карточка дня знает своё название даже

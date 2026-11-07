@@ -8,7 +8,8 @@ import { buildBookingCalendar } from './booking-logic';
 // Публичная страница бронирования (FR-003): только свободные будущие
 // интервалы, времена — в APP_TZ с явным поясом (ADR-009), форматирование —
 // на сервере. Чтение — RSC self-fetch через SDK с дефолтным окном API
-// (сейчас + 31 день, ADR-004/010); интерактив и мутации — в BookingFlow.
+// (сейчас + 14 дней — окно записи по макету #13, ADR-004/010); интерактив
+// и мутации — в BookingFlow.
 
 export const dynamic = 'force-dynamic';
 
@@ -124,7 +125,7 @@ export default async function HomePage() {
                     <rect x="3" y="4" width="18" height="18" rx="4" />
                     <path d="M8 2v4M16 2v4M3 10h18" />
                   </svg>
-                  <dt className="text-ink font-medium">Запись открыта на&nbsp;месяц вперёд</dt>
+                  <dt className="text-ink font-medium">Запись открыта на&nbsp;14 дней вперёд</dt>
                 </div>
               </dl>
 

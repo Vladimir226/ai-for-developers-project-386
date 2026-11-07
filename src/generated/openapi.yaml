@@ -101,7 +101,7 @@ paths:
         - name: to
           in: query
           required: false
-          description: Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 31 день.
+          description: 'Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 14 дней (окно записи, макет #13).'
           schema:
             type: string
             format: date-time
