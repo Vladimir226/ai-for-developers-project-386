@@ -1,5 +1,9 @@
 // Схема БД «Запись на звонок» (ADR-002): SQLite через Prisma, режим WAL.
-// Правила именования (§4 architecture.md): БД — snake_case, Prisma — camelCase + @map.
+// Правила именования (ADR-006): БД — snake_case, Prisma — camelCase + @map.
+// Доменная модель — ADR-0011 (карта #28, D1–D5): хранимые сущности — типы
+// событий, рабочие часы и брони; слоты вычисляются на лету и таблицы не имеют.
+// Ограничения значений (длины 1..100/≤500, минуты 15..180, 7 дней недели)
+// держит контракт и сервер; схема хранит только целостность ссылок.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,32 +14,49 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Опубликованный интервал (ADR-008, ADR-009). id — UUID: контракт (#12)
-// требует @format("uuid") для API; расхождение со сводкой §5 (cuid) осознанно
-// решено в пользу контракта — ADR-010 делает его источником истины API.
-model Slot {
-  id        String    @id @default(uuid())
-  startsAt  DateTime  @map("starts_at")
-  endsAt    DateTime  @map("ends_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  bookings  Booking[]
+// Тип события (D1): вид брони с фиксированной длительностью. Длительность
+// слота и шаг стартов равны durationMinutes (D2). Удаление типа — каскадное:
+// брони удаляются вместе с ним, время освобождается (D4).
+model EventType {
+  id              String    @id @default(uuid())
+  title           String
+  description     String?
+  durationMinutes Int       @map("duration_minutes")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  bookings        Booking[]
 
-  @@index([startsAt])
-  @@map("slots")
+  @@map("event_types")
 }
 
-// Активная бронь слота (ADR-008): UNIQUE(slot_id) — антидубль на уровне БД,
-// истина последней инстанции (NFR-002); отмена брони — DELETE строки, слот
-// снова свободен. Удаление слота каскадно удаляет связанную бронь.
+// Рабочие часы недели (D3): одна строка на день недели (weekday уникален).
+// В выходной границы равны 0 (в контракте минуты опциональны); дефолт
+// Пн–Пт 09:00–18:00, Сб–Вс выходные сеет сервер (#33).
+model WorkingHours {
+  weekday      Int     @unique
+  startMinutes Int     @map("start_minutes")
+  endMinutes   Int     @map("end_minutes")
+  isDayOff     Boolean @default(false) @map("is_day_off")
+
+  @@map("working_hours")
+}
+
+// Активная бронь (ADR-0011): интервал — полуинтервал [startsAt; endsAt).
+// endsAt денормализован из длительности типа на момент создания — по паре
+// колонок работает предикат наложения с бронями любых типов (D12) по
+// составному индексу. Занятость держит серверная транзакция: UNIQUE(slot_id)
+// из ADR-008 ушёл вместе с хранимыми слотами.
 model Booking {
-  id            String   @id @default(uuid())
-  slotId        String   @unique @map("slot_id")
-  bookerName    String   @map("booker_name")
-  bookerContact String   @map("booker_contact")
+  id            String    @id @default(uuid())
+  eventTypeId   String    @map("event_type_id")
+  startsAt      DateTime  @map("starts_at")
+  endsAt        DateTime  @map("ends_at")
+  bookerName    String    @map("booker_name")
+  bookerContact String    @map("booker_contact")
   comment       String?
-  createdAt     DateTime @default(now()) @map("created_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
 
-  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  eventType EventType @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
 
+  @@index([startsAt, endsAt])
   @@map("bookings")
 }

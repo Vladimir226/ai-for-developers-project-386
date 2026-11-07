@@ -13,13 +13,17 @@ export interface paths {
         };
         /**
          * Список броней
-         * @description Список броней владельца.
+         * @description Список броней владельца. `upcoming` — резерв фильтра «предстоящие»
+         *     (реализация — #36); без параметра возвращаются все брони.
          */
         get: operations["listBookings"];
         put?: never;
         /**
          * Забронировать слот
-         * @description Забронировать слот: ровно одна активная бронь на слот (NFR-002). 404 — слота нет; 409 — `SLOT_ALREADY_BOOKED` или `SLOT_IN_PAST`.
+         * @description Забронировать слот типа события: интервал — полуинтервал от `startsAt`
+         *     до `startsAt` + длительность типа. 404 — типа нет; 409 — `SLOT_IN_PAST`
+         *     (слот прошёл) или `SLOT_ALREADY_BOOKED` (наложение с любой активной
+         *     бронью, включая другие типы — D12; примыкание допустимо).
          */
         post: operations["createBooking"];
         delete?: never;
@@ -40,7 +44,7 @@ export interface paths {
         post?: never;
         /**
          * Отменить бронь
-         * @description Отменить бронь — слот снова становится свободным.
+         * @description Отменить бронь — время снова становится свободным для всех типов.
          */
         delete: operations["deleteBooking"];
         options?: never;
@@ -48,7 +52,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/slots": {
+    "/api/v1/event-types": {
         parameters: {
             query?: never;
             header?: never;
@@ -56,23 +60,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Слоты периода
-         * @description Слоты периода: `view=free` — только свободные будущие (публичная страница), `view=all` — все интервалы, включая забронированные и прошедшие (админ, FR-002). `from`/`to` опциональны.
+         * Список типов событий
+         * @description Список типов событий: страница видов брони для гостя и панель владельца.
          */
-        get: operations["listSlots"];
+        get: operations["listEventTypes"];
         put?: never;
         /**
-         * Опубликовать интервал
-         * @description Опубликовать интервал: `startsAt` в будущем, `endsAt` > `startsAt` (ADR-008, ADR-009). 409 — пересечение с существующим интервалом (`SLOT_OVERLAP`).
+         * Создать тип события
+         * @description Создать тип события (владелец): название 1..100, описание ≤500, длительность 15..180 минут.
          */
-        post: operations["createSlot"];
+        post: operations["createEventType"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/slots/{id}": {
+    "/api/v1/event-types/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,13 +84,67 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /**
+         * Изменить тип события
+         * @description Изменить тип события (владелец): полная замена полей. 404 — типа нет.
+         */
+        put: operations["updateEventType"];
         post?: never;
         /**
-         * Удалить интервал
-         * @description Удалить интервал вместе с активной бронью (ADR-008).
+         * Удалить тип события
+         * @description Удалить тип события (владелец) — каскадно вместе с его бронями (D4):
+         *     время освобождается для остальных типов.
          */
-        delete: operations["deleteSlot"];
+        delete: operations["deleteEventType"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/event-types/{id}/slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Свободные слоты типа
+         * @description Вычисляемые свободные слоты типа (ADR-0011): старты внутри рабочих часов с
+         *     шагом, равным длительности типа (D2), слот целиком помещается в день; окно
+         *     записи — 14 календарных дней с сегодня по `APP_TZ` (D6). `from`/`to`
+         *     опциональны. 404 — типа нет.
+         */
+        get: operations["listEventTypeSlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/working-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Рабочие часы недели
+         * @description Текущие рабочие часы недели (D3): по одной записи на каждый день 0..6.
+         */
+        get: operations["getWorkingHours"];
+        /**
+         * Задать рабочие часы
+         * @description Задать рабочие часы недели (владелец): ровно 7 дней, у рабочего дня
+         *     `startMinutes < endMinutes`, у выходного минуты не нужны. Перерывы внутри
+         *     дня не поддерживаются (D3).
+         */
+        put: operations["putWorkingHours"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -96,26 +154,23 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Бронь звонка на слот. */
+        /** @description Бронь: встреча гостя на выбранный слот типа события. */
         Booking: {
             /**
              * Format: uuid
              * @description Идентификатор брони (UUID).
              */
             id: string;
-            /**
-             * Format: uuid
-             * @description Идентификатор забронированного слота.
-             */
-            slotId: string;
+            /** @description Забронированный тип события. */
+            eventType: components["schemas"]["BookingEventType"];
             /**
              * Format: date-time
-             * @description Начало звонка (копия из слота), ISO-8601 UTC.
+             * @description Начало встречи, ISO-8601 UTC.
              */
             startsAt: string;
             /**
              * Format: date-time
-             * @description Конец звонка (копия из слота), ISO-8601 UTC.
+             * @description Конец встречи — `startsAt` + длительность типа, ISO-8601 UTC.
              */
             endsAt: string;
             /** @description Имя бронирующего. */
@@ -132,6 +187,21 @@ export interface components {
         };
         /** @description 201-ответ `POST /api/v1/bookings` — созданная бронь. */
         BookingCreated: components["schemas"]["Booking"];
+        /** @description Тип события, вложенный в бронь: длительность фиксируется на момент создания (ADR-0011). */
+        BookingEventType: {
+            /**
+             * Format: uuid
+             * @description Идентификатор типа (UUID).
+             */
+            id: string;
+            /** @description Название вида брони. */
+            title: string;
+            /**
+             * Format: int32
+             * @description Длительность в целых минутах.
+             */
+            durationMinutes: number;
+        };
         /** @description Тело ответа `GET /api/v1/bookings`. */
         BookingList: {
             bookings: components["schemas"]["Booking"][];
@@ -140,9 +210,14 @@ export interface components {
         CreateBookingRequest: {
             /**
              * Format: uuid
-             * @description Идентификатор бронируемого слота.
+             * @description Идентификатор типа события.
              */
-            slotId: string;
+            eventTypeId: string;
+            /**
+             * Format: date-time
+             * @description Начало слота, ISO-8601 UTC; слот должен быть будущим и свободным.
+             */
+            startsAt: string;
             /** @description Имя бронирующего. */
             bookerName: string;
             /** @description Контакт для связи. */
@@ -150,19 +225,8 @@ export interface components {
             /** @description Комментарий (необязателен). */
             comment?: string;
         };
-        /** @description Тело запроса `POST /api/v1/slots`. */
-        CreateSlotRequest: {
-            /**
-             * Format: date-time
-             * @description Начало интервала, ISO-8601 UTC; в будущем.
-             */
-            startsAt: string;
-            /**
-             * Format: date-time
-             * @description Конец интервала, ISO-8601 UTC; строго позже начала.
-             */
-            endsAt: string;
-        };
+        /** @description Тело запроса `POST /api/v1/event-types`. */
+        CreateEventTypeRequest: components["schemas"]["EventTypeDraft"];
         /** @description Тело ошибки (ADR-005). */
         ErrorBody: {
             code: components["schemas"]["ErrorCode"];
@@ -175,46 +239,103 @@ export interface components {
          * @description Стабильные машинные коды ошибок API (ADR-005): клиент интерпретирует ошибки только по ним.
          * @enum {string}
          */
-        ErrorCode: "VALIDATION_ERROR" | "NOT_FOUND" | "SLOT_OVERLAP" | "SLOT_ALREADY_BOOKED" | "SLOT_IN_PAST";
+        ErrorCode: "VALIDATION_ERROR" | "NOT_FOUND" | "SLOT_ALREADY_BOOKED" | "SLOT_IN_PAST";
         /** @description Конверт ошибок API (ADR-005): `{"error": {"code", "message", "details"?}}`. */
         ErrorEnvelope: {
             error: components["schemas"]["ErrorBody"];
         };
-        /** @description Опубликованный интервал времени, доступный для бронирования. */
-        Slot: {
+        /** @description Тип события (D1): вид брони с фиксированной длительностью; длительность слота и шаг стартов равны ей (D2). */
+        EventType: {
             /**
              * Format: uuid
-             * @description Идентификатор слота (UUID).
+             * @description Идентификатор типа (UUID).
              */
             id: string;
+            /** @description Название вида брони. */
+            title: string;
+            /** @description Описание для гостя (необязательное). */
+            description?: string;
+            /**
+             * Format: int32
+             * @description Длительность в целых минутах.
+             */
+            durationMinutes: number;
+        };
+        /** @description 201-ответ `POST /api/v1/event-types` — созданный тип. */
+        EventTypeCreated: components["schemas"]["EventType"];
+        /** @description Редактируемые поля типа события — общие для создания и замены. */
+        EventTypeDraft: {
+            /** @description Название вида брони. */
+            title: string;
+            /** @description Описание для гостя (необязательное). */
+            description?: string;
+            /**
+             * Format: int32
+             * @description Длительность в целых минутах.
+             */
+            durationMinutes: number;
+        };
+        /** @description Тело ответа `GET /api/v1/event-types`. */
+        EventTypeList: {
+            eventTypes: components["schemas"]["EventType"][];
+        };
+        /**
+         * @description Вычисляемый свободный слот (ADR-0011): в БД не хранится и идентификатора
+         *     не имеет — генерируется внутри рабочих часов с шагом, равным длительности
+         *     типа (D2), целиком помещаясь в день; гостю предлагаются только слоты без
+         *     наложения на активные брони (D12).
+         */
+        Slot: {
             /**
              * Format: date-time
-             * @description Начало интервала, ISO-8601 UTC.
+             * @description Начало слота, ISO-8601 UTC.
              */
             startsAt: string;
             /**
              * Format: date-time
-             * @description Конец интервала, ISO-8601 UTC; строго позже начала (ADR-008).
+             * @description Конец слота — `startsAt` + длительность типа, ISO-8601 UTC.
              */
             endsAt: string;
         };
-        /** @description 201-ответ `POST /api/v1/slots` — созданный слот. */
-        SlotCreated: components["schemas"]["Slot"];
-        /** @description Тело ответа `GET /api/v1/slots`. */
+        /** @description Тело ответа `GET /api/v1/event-types/{id}/slots`. */
         SlotList: {
             slots: components["schemas"]["Slot"][];
         };
-        /**
-         * @description Режим выборки слотов (FR-002).
-         * @enum {string}
-         */
-        SlotView: "free" | "all";
+        /** @description Тело запроса `PUT /api/v1/event-types/{id}` — полная замена полей. */
+        UpdateEventTypeRequest: components["schemas"]["EventTypeDraft"];
         /** @description Элемент `error.details` для `VALIDATION_ERROR`. */
         ValidationErrorItem: {
             /** @description Имя невалидного поля (camelCase, ADR-006). */
             field: string;
             /** @description Человекочитаемое сообщение (ru). */
             message: string;
+        };
+        /** @description Рабочие часы недели: ровно по одной записи на каждый день `0..6`. */
+        WorkingHours: {
+            days: components["schemas"]["WorkingHoursDay"][];
+        };
+        /**
+         * @description Рабочие часы одного дня недели (D3): интервал `[startMinutes; endMinutes)`
+         *     от полуночи или выходной. Перерывов внутри дня нет.
+         */
+        WorkingHoursDay: {
+            /**
+             * Format: int32
+             * @description День недели: 0 — воскресенье … 6 — суббота (как `Date#getDay`).
+             */
+            weekday: number;
+            /** @description Выходной: слоты в этот день не генерируются. */
+            isDayOff: boolean;
+            /**
+             * Format: int32
+             * @description Начало дня в минутах от полуночи; обязательно, когда `isDayOff = false`.
+             */
+            startMinutes?: number;
+            /**
+             * Format: int32
+             * @description Конец дня в минутах от полуночи (эксклюзивно); обязателен, когда `isDayOff = false`.
+             */
+            endMinutes?: number;
         };
     };
     responses: never;
@@ -227,7 +348,10 @@ export type $defs = Record<string, never>;
 export interface operations {
     listBookings: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Только предстоящие брони (резерв, #36). */
+                upcoming?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -276,7 +400,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description 409 — конфликт состояния: `SLOT_OVERLAP`, `SLOT_ALREADY_BOOKED`, `SLOT_IN_PAST`. */
+            /** @description 409 — конфликт состояния: `SLOT_ALREADY_BOOKED`, `SLOT_IN_PAST`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -325,16 +449,9 @@ export interface operations {
             };
         };
     };
-    listSlots: {
+    listEventTypes: {
         parameters: {
-            query?: {
-                /** @description Начало периода (ISO-8601 UTC); по умолчанию — сейчас. */
-                from?: string;
-                /** @description Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 14 дней (окно записи, макет #13). */
-                to?: string;
-                /** @description Режим выборки; по умолчанию `free`. */
-                view?: components["schemas"]["SlotView"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -347,21 +464,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SlotList"];
-                };
-            };
-            /** @description 422 — ошибка валидации полей. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
+                    "application/json": components["schemas"]["EventTypeList"];
                 };
             };
         };
     };
-    createSlot: {
+    createEventType: {
         parameters: {
             query?: never;
             header?: never;
@@ -370,21 +478,56 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateSlotRequest"];
+                "application/json": components["schemas"]["CreateEventTypeRequest"];
             };
         };
         responses: {
-            /** @description 201-ответ `POST /api/v1/slots` — созданный слот. */
+            /** @description 201-ответ `POST /api/v1/event-types` — созданный тип. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SlotCreated"];
+                    "application/json": components["schemas"]["EventTypeCreated"];
                 };
             };
-            /** @description 409 — конфликт состояния: `SLOT_OVERLAP`, `SLOT_ALREADY_BOOKED`, `SLOT_IN_PAST`. */
-            409: {
+            /** @description 422 — ошибка валидации полей. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateEventType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEventTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description The request has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventType"];
+                };
+            };
+            /** @description 404 — ресурс не найден. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -403,7 +546,7 @@ export interface operations {
             };
         };
     };
-    deleteSlot: {
+    deleteEventType: {
         parameters: {
             query?: never;
             header?: never;
@@ -423,6 +566,104 @@ export interface operations {
             };
             /** @description 404 — ресурс не найден. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    listEventTypeSlots: {
+        parameters: {
+            query?: {
+                /** @description Начало периода (ISO-8601 UTC); по умолчанию — сейчас. */
+                from?: string;
+                /** @description Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 14 дней (окно записи, D6). */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlotList"];
+                };
+            };
+            /** @description 404 — ресурс не найден. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description 422 — ошибка валидации полей. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    getWorkingHours: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingHours"];
+                };
+            };
+        };
+    };
+    putWorkingHours: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkingHours"];
+            };
+        };
+        responses: {
+            /** @description The request has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingHours"];
+                };
+            };
+            /** @description 422 — ошибка валидации полей. */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

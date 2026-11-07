@@ -10,9 +10,7 @@ enum ErrorCode {
   VALIDATION_ERROR: "VALIDATION_ERROR";
   /** Ресурс не найден (404). */
   NOT_FOUND: "NOT_FOUND";
-  /** Новый интервал пересекается с существующим (409). */
-  SLOT_OVERLAP: "SLOT_OVERLAP";
-  /** У слота уже есть активная бронь (409). */
+  /** Интервал занят: наложение с любой активной бронью, включая другие типы событий (409, D12). */
   SLOT_ALREADY_BOOKED: "SLOT_ALREADY_BOOKED";
   /** Слот уже начался или прошёл (409). */
   SLOT_IN_PAST: "SLOT_IN_PAST";
@@ -56,7 +54,7 @@ model NotFoundError {
   ...ErrorEnvelope;
 }
 
-/** 409 — конфликт состояния: `SLOT_OVERLAP`, `SLOT_ALREADY_BOOKED`, `SLOT_IN_PAST`. */
+/** 409 — конфликт состояния: `SLOT_ALREADY_BOOKED`, `SLOT_IN_PAST`. */
 @error
 model ConflictError {
   @statusCode
