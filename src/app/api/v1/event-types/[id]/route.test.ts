@@ -8,7 +8,7 @@ import {
   putEventType,
   seedEventTypeViaApi,
   silenceRequestLogs,
-  futureIso,
+  futureWorkingSlotStart,
 } from '@/lib/testing/api';
 import { clearTables, setupTestDatabase } from '@/lib/testing/test-db';
 
@@ -91,7 +91,7 @@ describe('DELETE /api/v1/event-types/{id}', () => {
   it('каскад D4: брони удаляются вместе с типом, время освобождается для остальных', async () => {
     const doomed = await seedEventTypeViaApi({ title: 'Исчезающий', durationMinutes: 60 });
     const staying = await seedEventTypeViaApi({ title: 'Остающийся', durationMinutes: 30 });
-    const startsAt = futureIso(48);
+    const startsAt = futureWorkingSlotStart().toISOString(); // пн 09:00 — валидный слот
 
     const booked = await postBooking({
       eventTypeId: doomed.id,

@@ -49,20 +49,37 @@ function wallParts(at: Date): { year: number; month: number; day: number } {
 }
 
 /**
+ * Полночь стены ближайшего будущего дня недели `weekday` (0 — воскресенье …
+ * 6 — суббота) не раньше чем через minHoursAhead часов, плюс addMinutes
+ * минут. Europe/Moscow — фиксированное смещение без DST (ADR-009).
+ */
+export function futureWallTime(weekday: number, minHoursAhead: number, addMinutes = 0): Date {
+  const min = new Date(Date.now() + minHoursAhead * 60 * 60 * 1000);
+  const { year, month, day } = wallParts(min);
+  for (let add = 0; ; add += 1) {
+    const midnightUtcMs = Date.UTC(year, month - 1, day + add);
+    if (new Date(midnightUtcMs).getUTCDay() === weekday) {
+      return new Date(midnightUtcMs - 3 * 60 * 60 * 1000 + addMinutes * 60 * 1000);
+    }
+  }
+}
+
+/**
  * Полночь стены ближайшего понедельника не раньше чем через minHoursAhead
  * часов: первый рабочий слот этого дня гарантированно в будущем (дефолт
  * рабочих часов начинается в 09:00, D3).
  */
 export function futureMondayMidnight(minHoursAhead = 72): Date {
-  const min = new Date(Date.now() + minHoursAhead * 60 * 60 * 1000);
-  const { year, month, day } = wallParts(min);
-  for (let add = 0; ; add += 1) {
-    const midnightUtcMs = Date.UTC(year, month - 1, day + add);
-    if (new Date(midnightUtcMs).getUTCDay() === 1) {
-      // Europe/Moscow — фиксированное смещение без DST (ADR-009)
-      return new Date(midnightUtcMs - 3 * 60 * 60 * 1000);
-    }
-  }
+  return futureWallTime(1, minHoursAhead);
+}
+
+/**
+ * Валидный старт слота по дефолту часов D3: понедельник 09:00 стены MSK
+ * (старт сетки любого типа — на сетке по построению), гарантированно в
+ * будущем и внутри окна записи (окончание ≤ now + 10 дней < 14, D6).
+ */
+export function futureWorkingSlotStart(minHoursAhead = 72): Date {
+  return futureWallTime(1, minHoursAhead, 9 * 60);
 }
 
 // ── Типы событий ────────────────────────────────────────────────────────────

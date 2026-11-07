@@ -105,6 +105,60 @@ export type FreeSlotsResult =
   { ok: true; slots: GeneratedSlot[] } | { ok: false; reason: 'event-type-not-found' };
 
 /**
+ * Окно записи (D6): 14 настенных дней начиная с сегодняшнего по timeZone —
+ * от полуночи сегодня до конца дня +13 (полночь следующего дня минус 1 мс).
+ * Единственный расчёт окна для GET слотов и серверного инварианта брони
+ * (ADR-004): «сегодня» определяется моментом вызова (now).
+ */
+export function bookingWindow(now: Date, timeZone: string): { from: Date; to: Date } {
+  const today = wallDateKey(now, timeZone);
+  const day = (offset: number) =>
+    new Date(Date.UTC(today.year, today.month - 1, today.day + offset)).toISOString().slice(0, 10);
+
+  const from = new Date(wallTimeToUtcIso(day(0), '00:00', timeZone));
+  const to = new Date(new Date(wallTimeToUtcIso(day(14), '00:00', timeZone)).getTime() - 1);
+  return { from, to };
+}
+
+/**
+ * Серверный инвариант слота (ADR-004, D6): startsAt — валидный старт слота
+ * типа: начало сетки рабочих часов дня (шаг = длительности, D2), слот
+ * целиком в часах не-выходного дня, в окне записи 14 настенных дней.
+ * Единственный источник истины «что такое слот» — генератор: предикат
+ * проверяет членство мгновения в множестве стартов окна (шов 3, чистая);
+ * «прошлость» старта здесь не рассматривается — это отдельное правило
+ * 409 SLOT_IN_PAST. O(окно) ≈ сотни слотов — дёшево при демо-нагрузке.
+ */
+export function isSlotStartOnGrid(
+  startsAt: Date,
+  durationMinutes: number,
+  workingHours: WorkingDayHours[],
+  now: Date,
+  timeZone: string,
+): boolean {
+  const window = bookingWindow(now, timeZone);
+  return generateSlots({
+    from: window.from,
+    to: window.to,
+    durationMinutes,
+    workingHours,
+    timeZone,
+  }).some((slot) => slot.startsAt.getTime() === startsAt.getTime());
+}
+
+/**
+ * Инвариант слота над БД: те же рабочие часы (дефолт D3, пока владелец
+ * не задал свою неделю), что видит гость в GET слотов.
+ */
+export async function isBookableSlotStart(
+  startsAt: Date,
+  durationMinutes: number,
+  now: Date,
+): Promise<boolean> {
+  return isSlotStartOnGrid(startsAt, durationMinutes, await getWorkingHours(), now, getAppTz());
+}
+
+/**
  * Свободные слоты типа в периоде (ADR-0011): кандидаты генерируются из
  * рабочих часов (дефолт D3 — пока владелец их не задал), затем вычитаются
  * брони — слот свободен, если не пересекается ни с одной активной бронью

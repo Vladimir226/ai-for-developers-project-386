@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { schemas } from '@/generated/zod';
 import { getDb } from '@/lib/db/prisma';
 import {
-  futureIso,
+  futureWallTime,
+  futureWorkingSlotStart,
   getBookings,
-  postBooking,
   pastIso,
+  postBooking,
   seedEventTypeViaApi,
   silenceRequestLogs,
-  startOfSecond,
 } from '@/lib/testing/api';
 import { clearTables, setupTestDatabase } from '@/lib/testing/test-db';
 
@@ -29,7 +29,8 @@ describe('POST /api/v1/bookings', () => {
 
   it('бронирует интервал: 201, тело — Booking по контракту, endsAt = startsAt + длительность типа', async () => {
     const type = await seedEventTypeViaApi({ title: 'Консультация', durationMinutes: 45 });
-    const startsAt = startOfSecond(Date.now() + 48 * 3600 * 1000);
+    // валидный старт слота по дефолту часов D3: пн 09:00 стены MSK (на сетке)
+    const startsAt = futureWorkingSlotStart();
     // то же мгновение, записанное со смещением +03:00 (стенные часы зоны)
     const withOffset = new Date(startsAt.getTime() + 3 * 3600 * 1000)
       .toISOString()
@@ -88,17 +89,20 @@ describe('POST /api/v1/bookings', () => {
 
   it('наложение с бронью того же типа → 409 SLOT_ALREADY_BOOKED с понятным сообщением', async () => {
     const type = await seedEventTypeViaApi({ durationMinutes: 60 });
+    const at9 = futureWorkingSlotStart();
     const first = await postBooking({
       eventTypeId: type.id,
-      startsAt: futureIso(48),
+      startsAt: at9.toISOString(),
       bookerName: 'Первый',
       bookerContact: 'email:first@b.co',
     });
     expect(first.status).toBe(201);
 
+    // шаг стартов равен длительности (D2): слоты одного типа не пересекаются
+    // на сетке — конфликт возможен только на том же старте
     const response = await postBooking({
       eventTypeId: type.id,
-      startsAt: futureIso(48.5),
+      startsAt: at9.toISOString(),
       bookerName: 'Мария',
       bookerContact: 'telegram: @maria',
     });
@@ -112,7 +116,7 @@ describe('POST /api/v1/bookings', () => {
   it('D12 межтиповое наложение: 60 мин @10:00 + 30 мин @10:30 → 409; примыкающее @11:00 → 201', async () => {
     const type60 = await seedEventTypeViaApi({ title: 'Час', durationMinutes: 60 });
     const type30 = await seedEventTypeViaApi({ title: 'Полчаса', durationMinutes: 30 });
-    const at10 = futureIso(48);
+    const at10 = futureWallTime(1, 72, 10 * 60); // пн 10:00 стены — валидный старт обоих типов
 
     const first = await postBooking({
       eventTypeId: type60.id,
@@ -147,7 +151,7 @@ describe('POST /api/v1/bookings', () => {
   it('интервал, вложенный в существующую бронь, тоже наложение → 409', async () => {
     const type60 = await seedEventTypeViaApi({ durationMinutes: 60 });
     const type15 = await seedEventTypeViaApi({ durationMinutes: 15 });
-    const at10 = futureIso(48);
+    const at10 = futureWallTime(1, 72, 10 * 60); // пн 10:00 стены
 
     const first = await postBooking({
       eventTypeId: type60.id,
@@ -173,7 +177,7 @@ describe('POST /api/v1/bookings', () => {
 
   it('гонка: 8 параллельных POST на одно окно → ровно один 201, остальные 409 (транзакция с предикатом)', async () => {
     const type = await seedEventTypeViaApi({ durationMinutes: 30 });
-    const startsAt = futureIso(48);
+    const startsAt = futureWorkingSlotStart().toISOString();
     const N = 8;
 
     const responses = await Promise.all(
@@ -230,6 +234,79 @@ describe('POST /api/v1/bookings', () => {
   });
 });
 
+describe('POST /api/v1/bookings — серверный инвариант слота (ADR-004, D6)', () => {
+  beforeEach(async () => {
+    silenceRequestLogs();
+    await clearTables();
+  });
+
+  const bookAt = (eventTypeId: string, startsAt: Date | string) =>
+    postBooking({
+      eventTypeId,
+      startsAt: typeof startsAt === 'string' ? startsAt : startsAt.toISOString(),
+      bookerName: 'Мария',
+      bookerContact: 'telegram: @maria',
+    });
+
+  const expectInvalidSlot = async (response: Response) => {
+    expect(response.status).toBe(422);
+    const body = schemas.ErrorEnvelope.parse(await response.json());
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.message).toEqual(expect.stringContaining('слот'));
+    expect(body.error.details?.[0]?.field).toBe('startsAt');
+  };
+
+  it('старт за пределами окна записи (3 недели вперёд, на сетке) → 422', async () => {
+    const type = await seedEventTypeViaApi({ durationMinutes: 30 });
+    const beyondWindow = new Date(
+      futureWallTime(1, 24, 9 * 60).getTime() + 21 * 24 * 60 * 60 * 1000,
+    );
+
+    await expectInvalidSlot(await bookAt(type.id, beyondWindow));
+  });
+
+  it('ночь (03:00 стены) вне рабочих часов → 422', async () => {
+    const type = await seedEventTypeViaApi({ durationMinutes: 30 });
+
+    await expectInvalidSlot(await bookAt(type.id, futureWallTime(1, 24, 3 * 60)));
+  });
+
+  it('выходной (суббота 10:00, внутри окна) → 422', async () => {
+    const type = await seedEventTypeViaApi({ durationMinutes: 30 });
+
+    await expectInvalidSlot(await bookAt(type.id, futureWallTime(6, 24, 10 * 60)));
+  });
+
+  it('старт вне сетки (10:17 при шаге 30 от 09:00) → 422', async () => {
+    const type = await seedEventTypeViaApi({ durationMinutes: 30 });
+    const offGrid = new Date(futureWallTime(1, 24, 10 * 60).getTime() + 17 * 60 * 1000);
+
+    await expectInvalidSlot(await bookAt(type.id, offGrid));
+  });
+
+  it('валидный слот на границе конца часов [17:30; 18:00) → 201', async () => {
+    const type = await seedEventTypeViaApi({ durationMinutes: 30 });
+
+    const response = await bookAt(type.id, futureWallTime(1, 24, 17 * 60 + 30));
+
+    expect(response.status).toBe(201);
+    const body = schemas.BookingCreated.parse(await response.json());
+    expect(new Date(body.endsAt).getTime()).toBe(
+      new Date(body.startsAt).getTime() + 30 * 60 * 1000,
+    );
+  });
+
+  it('примыкание остаётся допустимым: [10:00; 11:00) занято, [11:00; 11:30) → 201', async () => {
+    const type60 = await seedEventTypeViaApi({ durationMinutes: 60 });
+    const type30 = await seedEventTypeViaApi({ durationMinutes: 30 });
+    const at10 = futureWallTime(1, 72, 10 * 60);
+    const at11 = new Date(at10.getTime() + 60 * 60 * 1000);
+
+    expect((await bookAt(type60.id, at10)).status).toBe(201);
+    expect((await bookAt(type30.id, at11)).status).toBe(201);
+  });
+});
+
 describe('GET /api/v1/bookings', () => {
   beforeEach(async () => {
     silenceRequestLogs();
@@ -238,8 +315,8 @@ describe('GET /api/v1/bookings', () => {
 
   it('возвращает брони с вложенным типом по возрастанию начала; comment без значения опущен', async () => {
     const type = await seedEventTypeViaApi({ title: 'Консультация', durationMinutes: 30 });
-    const early = futureIso(24);
-    const late = futureIso(48);
+    const early = futureWorkingSlotStart().toISOString(); // пн 09:00
+    const late = futureWallTime(1, 72, 11 * 60).toISOString(); // пн 11:00 — тоже на сетке
 
     // бронируем в обратном порядке — порядок ответа задаёт начало, не создание
     await postBooking({
@@ -292,7 +369,7 @@ describe('GET /api/v1/bookings', () => {
 
     const upcoming = await postBooking({
       eventTypeId: type.id,
-      startsAt: futureIso(24),
+      startsAt: futureWorkingSlotStart().toISOString(),
       bookerName: 'Завтра',
       bookerContact: 'email:tomorrow@b.co',
     });
@@ -315,7 +392,7 @@ describe('GET /api/v1/bookings', () => {
 
     await postBooking({
       eventTypeId: type.id,
-      startsAt: futureIso(24),
+      startsAt: futureWorkingSlotStart().toISOString(),
       bookerName: 'Анна',
       bookerContact: 'phone:+79160000000',
     });

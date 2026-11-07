@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { schemas } from '@/generated/zod';
 import {
   deleteBooking,
-  futureIso,
+  futureWorkingSlotStart,
   getBookings,
   postBooking,
   seedEventTypeViaApi,
@@ -25,7 +25,7 @@ describe('DELETE /api/v1/bookings/{id}', () => {
     const type = await seedEventTypeViaApi();
     const created = await postBooking({
       eventTypeId: type.id,
-      startsAt: futureIso(24),
+      startsAt: futureWorkingSlotStart().toISOString(), // пн 09:00 — валидный слот
       bookerName: 'Анна',
       bookerContact: 'phone:+79160000000',
     });
@@ -49,7 +49,7 @@ describe('DELETE /api/v1/bookings/{id}', () => {
 
   it('после отмены интервал снова бронируется (примыкающий — тем более)', async () => {
     const type = await seedEventTypeViaApi({ durationMinutes: 60 });
-    const startsAt = futureIso(48);
+    const startsAt = futureWorkingSlotStart().toISOString(); // пн 09:00 — валидный слот
 
     const created = await postBooking({
       eventTypeId: type.id,

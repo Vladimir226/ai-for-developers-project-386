@@ -4,14 +4,15 @@ import {
   serializeEventType,
   updateEventType,
 } from '@/domain/event-types/event-types';
-import { readJsonBody } from '@/lib/http/json-body';
+import { parseBodyOr } from '@/lib/http/json-body';
 import { jsonError } from '@/lib/http/json-error';
 import { withRequestLogging } from '@/lib/http/with-request-logging';
 import { parseEventTypeDraft } from '@/lib/validation/event-type';
 
 // PUT/DELETE типа события (владелец): полная замена полей; удаление —
-// каскадное вместе с бронями (D4, FK ON DELETE CASCADE). 422 на битый JSON —
-// компромисс из PR #4 (в контракте только 422).
+// каскадное вместе с бронями (D4, FK ON DELETE CASCADE). Битый JSON и
+// невалидные поля — единый 422 VALIDATION_ERROR (parseBodyOr; аддендум
+// ADR-0005 от 2026-11-07).
 
 export const dynamic = 'force-dynamic';
 
@@ -20,14 +21,9 @@ type RouteContext = { params: Promise<{ id: string }> };
 export const PUT = withRequestLogging<RouteContext>(async (request, { params }) => {
   const { id } = await params;
 
-  const bodyResult = await readJsonBody(request);
-  if (!bodyResult.ok) {
-    return bodyResult.response;
-  }
-
-  const parsed = parseEventTypeDraft(bodyResult.body);
+  const parsed = await parseBodyOr(request, parseEventTypeDraft);
   if (!parsed.ok) {
-    return jsonError('VALIDATION_ERROR', 422, 'Невалидное тело запроса', parsed.issues);
+    return parsed.response;
   }
 
   const updated = await updateEventType(id, parsed.value);

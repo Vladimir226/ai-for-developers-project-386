@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateSlots, type WorkingDayHours } from './slots';
+import { bookingWindow, generateSlots, isSlotStartOnGrid, type WorkingDayHours } from './slots';
 
 // Чистый генератор вычисляемых слотов (ADR-0011): unit-тесты шва 3.
 // Генератор не зависит от «сейчас» — окно [from; to] задаёт вызывающий,
@@ -160,5 +160,76 @@ describe('generateSlots', () => {
         timeZone: MSK,
       }),
     ).toEqual([]);
+  });
+});
+
+describe('bookingWindow — окно записи (D6)', () => {
+  it('14 настенных дней начиная с сегодня: от полуночи сегодня до 23:59:59.999 дня +13', () => {
+    const now = msk(`2026-11-09T19:30`); // понедельник вечером — день уже начался
+
+    const window = bookingWindow(now, MSK);
+
+    expect(window.from.getTime()).toBe(msk(`${MONDAY_NOV9}T00:00`).getTime());
+    expect(window.to.getTime()).toBe(new Date('2026-11-22T23:59:59.999+03:00').getTime());
+  });
+
+  it('после конца рабочих часов первые слоты окна — завтра (GET от now, инъекция now)', () => {
+    const now = msk(`2026-11-09T19:00`); // понедельник после 18:00
+    const window = bookingWindow(now, MSK);
+
+    // дефолт GET слотов: период [now; окно] — понедельник уже не даёт слотов
+    const slots = generateSlots({
+      from: now,
+      to: window.to,
+      durationMinutes: 30,
+      workingHours: nineToEighteenWeek(),
+      timeZone: MSK,
+    });
+
+    expect(slots[0]?.startsAt.toISOString()).toBe('2026-11-10T06:00:00.000Z'); // вторник 09:00
+    expect(slots.every((slot) => slot.startsAt.getTime() > now.getTime())).toBe(true);
+  });
+});
+
+describe('isSlotStartOnGrid — серверный инвариант слота (ADR-004, D6)', () => {
+  // понедельник 19:00: сетка понедельника уже отработала, окно — пн 09..вс 22 ноября
+  const NOW = msk(`2026-11-09T19:00`);
+
+  it('старт на сетке в рабочие часы — допустим, включая границу конца часов', () => {
+    expect(isSlotStartOnGrid(msk('2026-11-10T10:00'), 30, nineToEighteenWeek(), NOW, MSK)).toBe(
+      true,
+    );
+    // [17:30; 18:00) — последний старт, заканчивается ровно в конец часов
+    expect(isSlotStartOnGrid(msk('2026-11-10T17:30'), 30, nineToEighteenWeek(), NOW, MSK)).toBe(
+      true,
+    );
+  });
+
+  it('вне сетки (10:17 при шаге 30 от 09:00) — не слот', () => {
+    expect(isSlotStartOnGrid(msk('2026-11-10T10:17'), 30, nineToEighteenWeek(), NOW, MSK)).toBe(
+      false,
+    );
+  });
+
+  it('ночь и выходной — не слот', () => {
+    expect(isSlotStartOnGrid(msk('2026-11-10T03:00'), 30, nineToEighteenWeek(), NOW, MSK)).toBe(
+      false,
+    );
+    expect(isSlotStartOnGrid(msk('2026-11-14T10:00'), 30, nineToEighteenWeek(), NOW, MSK)).toBe(
+      false,
+    ); // суббота
+  });
+
+  it('за окном записи (15-й настенный день и дальше) — не слот', () => {
+    // 2026-11-23 — понедельник на сетке, но окно кончается 22 ноября
+    expect(isSlotStartOnGrid(msk('2026-11-23T10:00'), 30, nineToEighteenWeek(), NOW, MSK)).toBe(
+      false,
+    );
+  });
+
+  it('утренний слот сегодняшнего дня в окне, даже когда уже прошёл (прошлость — отдельное правило 409)', () => {
+    expect(isSlotStartOnGrid(msk('2026-11-09T09:00'), 30, nineToEighteenWeek(), NOW, MSK)).toBe(
+      true,
+    );
   });
 });

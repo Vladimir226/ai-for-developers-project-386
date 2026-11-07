@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createBooking, listBookings, serializeBooking } from '@/domain/bookings/bookings';
-import { readJsonBody } from '@/lib/http/json-body';
+import { parseBodyOr } from '@/lib/http/json-body';
 import { jsonError } from '@/lib/http/json-error';
 import { withRequestLogging } from '@/lib/http/with-request-logging';
 import { parseCreateBookingBody, parseUpcomingParam } from '@/lib/validation/booking';
@@ -8,7 +8,9 @@ import { parseCreateBookingBody, parseUpcomingParam } from '@/lib/validation/boo
 // Route Handlers броней (ADR-001): формы — контракт v2 (#32, ADR-010),
 // конверт ошибок — ADR-005. Занятость — наложение интервалов с любой
 // активной бронью, включая другие типы (D12), в транзакции с предикатом.
-// 422 на битый JSON — компромисс из PR #4 (в контракте только 422).
+// Серверный инвариант слота (ADR-004, D6) — старт только из окна записи на
+// сетке рабочих часов. Битый JSON и невалидные поля — единый 422
+// VALIDATION_ERROR (parseBodyOr; аддендум ADR-0005 от 2026-11-07).
 
 export const dynamic = 'force-dynamic';
 
@@ -24,14 +26,9 @@ export const GET = withRequestLogging(async (request) => {
 });
 
 export const POST = withRequestLogging(async (request) => {
-  const bodyResult = await readJsonBody(request);
-  if (!bodyResult.ok) {
-    return bodyResult.response;
-  }
-
-  const parsed = parseCreateBookingBody(bodyResult.body);
+  const parsed = await parseBodyOr(request, parseCreateBookingBody);
   if (!parsed.ok) {
-    return jsonError('VALIDATION_ERROR', 422, 'Невалидное тело запроса', parsed.issues);
+    return parsed.response;
   }
 
   const result = await createBooking(parsed.value, new Date());
@@ -41,6 +38,21 @@ export const POST = withRequestLogging(async (request) => {
     }
     if (result.reason === 'slot-in-past') {
       return jsonError('SLOT_IN_PAST', 409, 'Слот уже начался или прошёл');
+    }
+    if (result.reason === 'invalid-slot-start') {
+      // Серверный инвариант (ADR-004, D6): старт не является свободным
+      // слотом окна записи — вне сетки часов, в выходной/ночь или за окном
+      return jsonError(
+        'VALIDATION_ERROR',
+        422,
+        'Время должно быть свободным слотом из окна записи',
+        [
+          {
+            field: 'startsAt',
+            message: 'выберите начало из предложенных слотов: окно 14 дней, рабочие часы',
+          },
+        ],
+      );
     }
     // Гость выбирает из вычисляемых слотов: этот интервал пересекается
     // с существующей встречей (любого типа) — понятное сообщение о конфликте
