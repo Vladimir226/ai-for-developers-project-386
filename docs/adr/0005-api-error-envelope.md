@@ -1,0 +1,34 @@
+# Конверт ошибок и ответов API
+
+**Status:** Accepted (amended by ADR-0010)
+**Drives:** NFR-005, NFR-007
+**Date:** 2026-11-07 (перенесён из `bmad-output/architecture.md` §3, карта #28/D11)
+
+**Context:** Клиент и e2e-тесты должны одинаково интерпретировать любую ошибку.
+Без зафиксированной формы каждый агент изобретёт свой формат.
+
+**Decision:**
+
+- Успех: `200`/`201` с JSON-телом ресурса; `204` без тела для DELETE.
+- Ошибка: всегда JSON `{"error": {"code": "<MACHINE_CODE>", "message": "<человекочитаемо, ru>", "details": {...}?}}`.
+- Коды HTTP: `400` — битый запрос (не JSON/не тот Content-Type);
+  `404` — ресурс не найден; `409` — конфликт состояния (интервал уже забронирован,
+  пересечение интервалов); `422` — ошибка валидации полей (details содержит
+  список `field`/`message`); `500` — непредвиденная ошибка сервера.
+- `error.code` — SCREAMING_SNAKE_CASE, стабильный машинный контракт
+  (`SLOT_ALREADY_BOOKED`, `SLOT_OVERLAP`, `VALIDATION_ERROR`, `NOT_FOUND`).
+- Валидация тела — Zod-схемы, генерируемые из OpenAPI-контракта (ADR-0010);
+  hand-written схемы допустимы только как дополнение для field-level
+  UX-сообщений и помечаются источником.
+
+**Consequences — LOCKED for all stories:** все Route Handlers возвращают
+исключительно эти формы; клиентская обработка ошибок — только по `error.code`.
+
+- Easier: единая обработка ошибок в UI и тестах.
+- Accepted cost: чуть больше boilerplate на каждый handler. Mitigation:
+  общий helper `jsonError(code, status, message, details)`.
+
+**Alternatives:** JSON:API errors (тяжелее, чем нужно); Problem Details RFC 7807
+(приемлемо, но выбран более простой собственный конверт).
+
+**Revisit when:** появится внешнее API-потребление с требованиями стандартов.

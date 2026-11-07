@@ -200,10 +200,11 @@ npm run test:e2e
 
 ## Архитектура и документы
 
-- [`bmad-output/architecture.md`](bmad-output/architecture.md) — архитектура и
-  ADR-001…010 (канонический источник решений)
+- [`docs/adr/`](docs/adr/README.md) — ADR-0001…0011 отдельными файлами
+  (канонический источник решений; ADR-008 superseded by ADR-0011)
 - [`GLOSSARY.md`](GLOSSARY.md) — термины проекта
-- [`docs/adr/README.md`](docs/adr/README.md) — указатель ADR
+- [`bmad-output/architecture.md`](bmad-output/architecture.md) — архитектурный
+  документ (§3 — индекс ADR, исторический)
 - [`docs/design/README.md`](docs/design/README.md) — дизайн-направление и токены
 - [`contract/main.tsp`](contract/main.tsp) — TypeSpec-контракт API
 
