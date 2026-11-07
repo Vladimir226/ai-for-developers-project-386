@@ -1,0 +1,9 @@
+# TypeSpec-конфигурация (ADR-010): контракт — единственный источник истины API.
+# Компиляция: npm run contract:compile → src/generated/openapi.yaml
+emit:
+  - '@typespec/openapi3'
+options:
+  '@typespec/openapi3':
+    emitter-output-dir: '{project-root}/../src/generated'
+    file-type: yaml
+    output-file: openapi.yaml

@@ -1,0 +1,8 @@
+# Redocly lint сгенерированной OpenAPI (ADR-010): входит в `make lint`.
+# Этот же конфиг по умолчанию читает openapi-typescript (валидация входа).
+extends:
+  - recommended
+rules:
+  # ADR-003: аутентификации в проекте нет (учебный single-owner сервис),
+  # поэтому security в спеке не описываем.
+  security-defined: off

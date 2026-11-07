@@ -470,6 +470,9 @@ hand-written Zod-схемы (ADR-005) — оба решения обходили
   ловится drift-check'ом и парсингом ответов в тестах; self-fetch в RSC
   добавляет round-trip на рендер (незаметно при бюджете NFR-005 — 300 мс
   p95, демо-нагрузка); в проекте появляется дополнительный тулчейн.
+  `openapi-zod-client` генерирует синтаксис Zod 3 (сам зависит от zod ^3),
+  поэтому runtime-зависимость — zod 3.x; переезд на Zod 4 — при поддержке
+  генератором.
 
 **Alternatives:** hand-written Zod как источник схемы (второй источник
 истины); NestJS + tsoa (контракт генерируется из кода — обратное
@@ -721,24 +724,24 @@ Next.js App Router или второй клиент фронтенда.
 
 ## 8. Technology Stack
 
-| Layer          | Choice                             | Version    | Rationale (→ driver)                                                    | ADR              |
-| -------------- | ---------------------------------- | ---------- | ----------------------------------------------------------------------- | ---------------- |
-| Language       | TypeScript                         | 5.x        | Один язык на стеке → выравнивание агентов (NFR-003)                     | ADR-004          |
-| Framework      | Next.js (App Router)               | 15.x       | RSC-чтение + Route Handlers в одном артефакте → single image (NFR-001)  | ADR-001, 004     |
-| Styling        | TailwindCSS                        | 4.x        | Быстрые UI-итерации, адаптив без кастомного CSS-слоя (NFR-004)          | —                |
-| Validation     | Zod                                | 4.x        | Схемы генерируются из OpenAPI — один источник валидации (NFR-007)       | ADR-005, ADR-010 |
-| API contract   | TypeSpec                           | latest     | ТЗ: контракт — источник истины API                                      | ADR-010          |
-| SDK codegen    | openapi-typescript + openapi-fetch | latest     | Типы + нативный fetch-клиент из OpenAPI (ТЗ)                            | ADR-010          |
-| Zod codegen    | openapi-zod-client                 | latest     | Zod-схемы из OpenAPI; конформанс в тестах                               | ADR-010          |
-| Spec lint      | @redocly/cli                       | latest     | Линт OpenAPI + drift-check в `make lint`                                | ADR-010          |
-| ORM            | Prisma                             | 6.x        | Типобезопасный доступ + миграции; единственный владелец схемы (NFR-003) | ADR-002          |
-| Database       | SQLite (WAL)                       | встроенная | Нулевая конфигурация в контейнере (NFR-001, NFR-008)                    | ADR-002          |
-| Unit/API tests | Vitest                             | 3.x        | Нативный TS, общий toolchain с Next (NFR-003)                           | —                |
-| E2E tests      | Playwright                         | 1.x        | Единственный e2e-сценарий бронирования (NFR-003)                        | —                |
-| Lint/format    | ESLint (flat config), Prettier     | latest     | Единый стиль для агентов (NFR-009)                                      | ADR-006          |
-| Runtime        | Node.js                            | 22 LTS     | Совпадает с базовым образом `node:22-alpine` (NFR-001)                  | ADR-007          |
-| Infrastructure | Docker multi-stage, node:22-alpine | —          | Ограничение задания (NFR-001, NFR-007)                                  | ADR-007          |
-| CI glue        | Makefile (install/test/lint)       | —          | Требование hexlet-check (NFR-009)                                       | ADR-007          |
+| Layer          | Choice                             | Version    | Rationale (→ driver)                                                                                                                                                | ADR              |
+| -------------- | ---------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Language       | TypeScript                         | 5.x        | Один язык на стеке → выравнивание агентов (NFR-003)                                                                                                                 | ADR-004          |
+| Framework      | Next.js (App Router)               | 15.x       | RSC-чтение + Route Handlers в одном артефакте → single image (NFR-001)                                                                                              | ADR-001, 004     |
+| Styling        | TailwindCSS                        | 4.x        | Быстрые UI-итерации, адаптив без кастомного CSS-слоя (NFR-004)                                                                                                      | —                |
+| Validation     | Zod                                | 3.x        | Схемы генерируются из OpenAPI — один источник валидации (NFR-007). `openapi-zod-client` генерирует zod-3 синтаксис — до поддержки генератором zod 4 остаёмся на 3.x | ADR-005, ADR-010 |
+| API contract   | TypeSpec                           | latest     | ТЗ: контракт — источник истины API                                                                                                                                  | ADR-010          |
+| SDK codegen    | openapi-typescript + openapi-fetch | latest     | Типы + нативный fetch-клиент из OpenAPI (ТЗ)                                                                                                                        | ADR-010          |
+| Zod codegen    | openapi-zod-client                 | latest     | Zod-схемы из OpenAPI; конформанс в тестах                                                                                                                           | ADR-010          |
+| Spec lint      | @redocly/cli                       | latest     | Линт OpenAPI + drift-check в `make lint`                                                                                                                            | ADR-010          |
+| ORM            | Prisma                             | 6.x        | Типобезопасный доступ + миграции; единственный владелец схемы (NFR-003)                                                                                             | ADR-002          |
+| Database       | SQLite (WAL)                       | встроенная | Нулевая конфигурация в контейнере (NFR-001, NFR-008)                                                                                                                | ADR-002          |
+| Unit/API tests | Vitest                             | 3.x        | Нативный TS, общий toolchain с Next (NFR-003)                                                                                                                       | —                |
+| E2E tests      | Playwright                         | 1.x        | Единственный e2e-сценарий бронирования (NFR-003)                                                                                                                    | —                |
+| Lint/format    | ESLint (flat config), Prettier     | latest     | Единый стиль для агентов (NFR-009)                                                                                                                                  | ADR-006          |
+| Runtime        | Node.js                            | 22 LTS     | Совпадает с базовым образом `node:22-alpine` (NFR-001)                                                                                                              | ADR-007          |
+| Infrastructure | Docker multi-stage, node:22-alpine | —          | Ограничение задания (NFR-001, NFR-007)                                                                                                                              | ADR-007          |
+| CI glue        | Makefile (install/test/lint)       | —          | Требование hexlet-check (NFR-009)                                                                                                                                   | ADR-007          |
 
 **Alternatives considered:** PostgreSQL — мощнее, но ломает single-image драйвер;
 NestJS+SPA — два билда в одном образе без выгоды масштаба; Drizzle вместо
