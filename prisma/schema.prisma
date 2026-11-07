@@ -1,0 +1,12 @@
+// Схема БД «Запись на звонок» (ADR-002): SQLite через Prisma, режим WAL.
+// Сущности приезжают вместе со своими тикетами: Slot — в #4, Booking — в #6.
+// Правила именования (§4 architecture.md): БД — snake_case, Prisma — camelCase + @map.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
