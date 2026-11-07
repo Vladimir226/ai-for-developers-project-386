@@ -1,14 +1,11 @@
 import type { Metadata } from 'next';
-import { Manrope } from 'next/font/google';
+// Manrope 400–800 + кириллица из npm-пакета (#29): шрифты приходят из
+// npm-реестра (он и так нужен для npm ci), а не с fonts.googleapis.com —
+// сборка образа герметична. index.css пакета объявляет @font-face
+// 'Manrope Variable' (wght 200–800) с unicode-range по всем subset'ам,
+// включая кириллицу; font-family связывается с токенами в globals.css.
+import '@fontsource-variable/manrope';
 import './globals.css';
-
-// Manrope 400–800 из макета #13; next/font самохостит файлы в _next/static.
-const manrope = Manrope({
-  subsets: ['latin', 'cyrillic'],
-  weight: ['400', '500', '600', '700', '800'],
-  display: 'swap',
-  variable: '--font-manrope',
-});
 
 export const metadata: Metadata = {
   title: 'Запись на звонок',
@@ -17,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ru" className={manrope.variable}>
+    <html lang="ru">
       <body className="font-sans">{children}</body>
     </html>
   );

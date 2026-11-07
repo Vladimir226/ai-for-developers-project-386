@@ -14,6 +14,27 @@ const eslintConfig = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   prettierConfig,
   {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      // герметичность сборки (ADR-007, #29): next/font/google качает шрифты
+      // с fonts.googleapis.com на этапе next build — сбой сети роняет сборку
+      // образа (hexlet-check run 42404916508). Шрифты — из npm (@fontsource)
+      // или next/font/local с закоммиченным файлом.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'next/font/google',
+              message:
+                'Шрифт из Google Fonts скачивается во время сборки — используй @fontsource/* из npm или next/font/local.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: [
       'node_modules/**',
       '.next/**',
