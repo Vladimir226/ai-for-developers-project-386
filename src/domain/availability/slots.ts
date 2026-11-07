@@ -73,10 +73,7 @@ export function generateSlots(input: GenerateSlotsInput): GeneratedSlot[] {
   const lastDay = wallDateKey(to, timeZone);
   const firstDayUtcMs = Date.UTC(firstDay.year, firstDay.month - 1, firstDay.day);
   const lastDayUtcMs = Date.UTC(lastDay.year, lastDay.month - 1, lastDay.day);
-  const cappedLastDayUtcMs = Math.min(
-    lastDayUtcMs,
-    firstDayUtcMs + (MAX_PERIOD_DAYS - 1) * DAY_MS,
-  );
+  const cappedLastDayUtcMs = Math.min(lastDayUtcMs, firstDayUtcMs + (MAX_PERIOD_DAYS - 1) * DAY_MS);
 
   const slots: GeneratedSlot[] = [];
   for (let dayUtcMs = firstDayUtcMs; dayUtcMs <= cappedLastDayUtcMs; dayUtcMs += DAY_MS) {
@@ -105,8 +102,7 @@ export function generateSlots(input: GenerateSlotsInput): GeneratedSlot[] {
 }
 
 export type FreeSlotsResult =
-  | { ok: true; slots: GeneratedSlot[] }
-  | { ok: false; reason: 'event-type-not-found' };
+  { ok: true; slots: GeneratedSlot[] } | { ok: false; reason: 'event-type-not-found' };
 
 /**
  * Свободные слоты типа в периоде (ADR-0011): кандидаты генерируются из
@@ -151,7 +147,9 @@ export async function listFreeSlots(
 
   return {
     ok: true,
-    slots: candidates.filter((slot) => !bookings.some((booking) => intervalsOverlap(slot, booking))),
+    slots: candidates.filter(
+      (slot) => !bookings.some((booking) => intervalsOverlap(slot, booking)),
+    ),
   };
 }
 

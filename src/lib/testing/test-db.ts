@@ -35,5 +35,11 @@ export function setupTestDatabase(): void {
   });
 }
 
-// Хелперы очистки таблиц между тестами вернутся вместе с роутами новой
-// модели (#33): очистка booking/eventType/workingHours.
+/** Чистит таблицы новой модели между тестами (setup, не проверка). */
+export async function clearTables(): Promise<void> {
+  const { getDb } = await import('@/lib/db/prisma');
+  const db = await getDb();
+  await db.booking.deleteMany();
+  await db.eventType.deleteMany();
+  await db.workingHours.deleteMany();
+}

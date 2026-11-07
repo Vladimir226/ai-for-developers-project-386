@@ -50,7 +50,11 @@ export function parseWorkingHoursBody(body: unknown): ParseResult<WorkingHoursDa
     if (day.endMinutes === undefined) {
       issues.push({ field: `days.${index}.endMinutes`, message: REQUIRED_FOR_WORKING });
     }
-    if (day.startMinutes !== undefined && day.endMinutes !== undefined && day.startMinutes >= day.endMinutes) {
+    if (
+      day.startMinutes !== undefined &&
+      day.endMinutes !== undefined &&
+      day.startMinutes >= day.endMinutes
+    ) {
       issues.push({ field: `days.${index}.endMinutes`, message: END_AFTER_START });
     }
   });
