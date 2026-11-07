@@ -15,15 +15,17 @@ describe('middleware: request-id', () => {
     expect(response.headers.get('x-request-id')).toMatch(UUID_RE);
   });
 
-  it('сохраняет пришедший x-request-id без перегенерации', async () => {
+  it('заменяет пришедший x-request-id сгенерированным — уникальность гарантирована сервером', async () => {
     const { middleware } = await import('./middleware');
 
     const response = middleware(
       new NextRequest('http://localhost:3000/', {
-        headers: { 'x-request-id': 'given-id' },
+        headers: { 'x-request-id': 'spoofed-id' },
       }),
     );
 
-    expect(response.headers.get('x-request-id')).toBe('given-id');
+    const requestId = response.headers.get('x-request-id');
+    expect(requestId).toMatch(UUID_RE);
+    expect(requestId).not.toBe('spoofed-id');
   });
 });

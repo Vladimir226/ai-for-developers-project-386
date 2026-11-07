@@ -307,6 +307,9 @@ React Query/SWR поверх RSC (дублирует серверное чтен
   в Prisma-схеме поля camelCase с `@map`.
 - TypeScript: типы/классы — PascalCase; переменные/функции — camelCase;
   файлы компонентов — PascalCase.tsx, остальные — kebab-case.ts.
+  Оговорка: зарезервированные иена файлов Next.js App Router
+  (`page.tsx`, `layout.tsx`, `route.ts`, `middleware.ts` и т.п.) остаются в
+  нижнем регистре — переименование ломает роутинг.
 - Идентификаторы в коде — английские; строки UI — русские.
 - Сущности домена: `Slot` (опубликованный интервал), `Booking` (бронь).
 

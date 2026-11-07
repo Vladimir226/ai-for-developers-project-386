@@ -37,4 +37,21 @@ describe('GET /api/health', () => {
     });
     expect(typeof entry.durationMs).toBe('number');
   });
+
+  it('логирует одну JSON-строкой и 500, если handler бросил исключение', async () => {
+    const lines: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((line) => lines.push(String(line)));
+
+    const { withRequestLogging } = await import('@/lib/http/with-request-logging');
+    const handler = withRequestLogging(async () => {
+      throw new Error('boom');
+    });
+
+    await expect(handler(new Request('http://localhost:3000/api/health'))).rejects.toThrow('boom');
+    log.mockRestore();
+
+    expect(lines).toHaveLength(1);
+    const entry = JSON.parse(lines[0]) as Record<string, unknown>;
+    expect(entry).toMatchObject({ method: 'GET', path: '/api/health', status: 500 });
+  });
 });
