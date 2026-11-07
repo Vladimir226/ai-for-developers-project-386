@@ -9,18 +9,18 @@
 
 ## Текущие решения
 
-| ADR | Решение (сводка) |
-|-----|------------------|
-| ADR-001 | REST + JSON API, префикс `/api/v1`; ресурсы во множественном числе |
-| ADR-002 | SQLite (WAL) через Prisma; файл БД в volume `/data` |
-| ADR-003 | Без аутентификации; single-owner модель |
-| ADR-004 | Server-authoritative state; чтение и мутации UI — через SDK, `router.refresh()` *(поправлен ADR-010)* |
-| ADR-005 | Конверт ошибок API; валидация — Zod-схемы из контракта *(поправлен ADR-010)* |
-| ADR-006 | Конвенции именования: URL kebab-case, JSON camelCase, БД snake_case |
-| ADR-007 | Один multi-stage Docker-образ (non-root, volume, HEALTHCHECK); Makefile для hexlet-check CI |
-| ADR-008 | Дискретные слоты (1 интервал = 1 звонок); антидубль UNIQUE `slot_id`; отмена = DELETE |
-| ADR-009 | Время: UTC в хранении и передаче; отображение в `APP_TZ` на сервере |
-| ADR-010 | Контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod; сервер реализуется по контракту |
+| ADR     | Решение (сводка)                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------------- |
+| ADR-001 | REST + JSON API, префикс `/api/v1`; ресурсы во множественном числе                                    |
+| ADR-002 | SQLite (WAL) через Prisma; файл БД в volume `/data`                                                   |
+| ADR-003 | Без аутентификации; single-owner модель                                                               |
+| ADR-004 | Server-authoritative state; чтение и мутации UI — через SDK, `router.refresh()` _(поправлен ADR-010)_ |
+| ADR-005 | Конверт ошибок API; валидация — Zod-схемы из контракта _(поправлен ADR-010)_                          |
+| ADR-006 | Конвенции именования: URL kebab-case, JSON camelCase, БД snake_case                                   |
+| ADR-007 | Один multi-stage Docker-образ (non-root, volume, HEALTHCHECK); Makefile для hexlet-check CI           |
+| ADR-008 | Дискретные слоты (1 интервал = 1 звонок); антидубль UNIQUE `slot_id`; отмена = DELETE                 |
+| ADR-009 | Время: UTC в хранении и передаче; отображение в `APP_TZ` на сервере                                   |
+| ADR-010 | Контракт-фёрст: TypeSpec → OpenAPI → SDK + Zod; сервер реализуется по контракту                       |
 
 ## Как добавить новый ADR
 
