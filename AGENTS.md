@@ -13,3 +13,7 @@ Default canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `read
 ### Domain docs
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Ticket workflow
+
+Working a ticket (branch → TDD → PR → review → merge): environment checks at start, probe-first, pinning tests, merge modes. See `docs/agents/process.md`.
