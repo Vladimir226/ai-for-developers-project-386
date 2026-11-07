@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import {
   dayTitle,
   firstDayWithSlots,
@@ -10,19 +10,45 @@ import {
   slotTimeLabel,
   slotsSection,
   upcomingBookings,
+  type EventTypeJson,
 } from './helpers';
 
 // Браузерный сценарий шва 2 по новой модели (аддендум №2 спеки, #37):
 // гость выбирает тип события → календарь 14 дат → слот → форма →
-// «Бронь подтверждена» → слот исчезает из свободных. Второй тест —
-// конкурентное занятие окна (D12): соперник бронирует то же время прямым
-// POST до отправки формы, проигравший видит баннер «Это время только что
+// «Бронь подтверждена» → слот исчезает из свободных → владелец видит
+// встречу в разделе «Брони» на /admin. Второй тест — конкурентное
+// занятие окна (D12): соперник бронирует то же время прямым POST до
+// отправки формы, проигравший видит баннер «Это время только что
 // заняли» и обновлённый список без слота.
 //
 // Сервер настоящий, без подмен API (D7); один webServer и одна временная
 // БД на прогон (workers: 1), порядок тестов не важен: основной сценарий
 // бронирует первый слот первого открытого дня, конкурентный — последний
 // слот своего первого открытого дня, интервалы тестов не налагаются.
+//
+// Уборка: БД одна на прогон, а smoke проверяет на /admin пустое состояние
+// «Брони» — после каждого теста сеянные типы удаляются (каскад D4 убирает
+// и брони), smoke видит чистый список.
+
+const seededTypeIds = new Set<string>();
+
+/** Сеет тип события и регистрирует его для уборки после теста. */
+async function seedAndTrack(
+  request: APIRequestContext,
+  draft: { title: string; description?: string; durationMinutes: number },
+): Promise<EventTypeJson> {
+  const type = await seedEventType(request, draft);
+  seededTypeIds.add(type.id);
+  return type;
+}
+
+test.afterEach(async ({ request }) => {
+  for (const id of seededTypeIds) {
+    const response = await request.delete(`/api/v1/event-types/${id}`);
+    expect(response.status(), `уборка сеянного типа ${id} (каскад D4)`).toBe(204);
+  }
+  seededTypeIds.clear();
+});
 
 test.describe('выбор типа → календарь → слот → бронь', () => {
   test('гость бронирует «Созвон 30», слот исчезает из свободных, бронь видна владельцу', async ({
@@ -30,12 +56,12 @@ test.describe('выбор типа → календарь → слот → бр�
     request,
   }) => {
     // сеяние владельца: два вида брони разной длительности
-    const call30 = await seedEventType(request, {
+    const call30 = await seedAndTrack(request, {
       title: 'Созвон 30',
       description: 'Короткий созвон один на один',
       durationMinutes: 30,
     });
-    await seedEventType(request, {
+    await seedAndTrack(request, {
       title: 'Разбор 60',
       description: 'Подробный разбор проекта',
       durationMinutes: 60,
@@ -97,8 +123,16 @@ test.describe('выбор типа → календарь → слот → бр�
       slot.startsAt,
     );
 
-    // 7. Владелец видит предстоящую бронь: раздел «Брони» админки — тикет
-    //    #36, в этой ветке ещё не смержен — проверка списком по API
+    // 7. Владелец видит встречу в своём списке (шаг 6 ТЗ): раздел «Брони»
+    //    на /admin (#36, серверный рендер предстоящих всех типов) показывает
+    //    карточку с именем гостя, типом и временем
+    await page.goto('/admin');
+    const card = page.locator('section[aria-label="Брони"] li', { hasText: 'Мария' });
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Созвон 30');
+    await expect(card).toContainText(label);
+
+    // дополнительное утверждение — та же бронь списком по API
     const mine = (await upcomingBookings(request)).find(
       (booking) => booking.startsAt === slot.startsAt,
     );
@@ -114,7 +148,7 @@ test.describe('выбор типа → календарь → слот → бр�
     page,
     request,
   }) => {
-    const type = await seedEventType(request, {
+    const type = await seedAndTrack(request, {
       title: 'Планёрка 30',
       description: 'Быстрая планёрка команды',
       durationMinutes: 30,
