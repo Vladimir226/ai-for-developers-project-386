@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+
+/*
+ * Дизайн-токены направления C «Спокойный шалфей» (docs/design/README.md,
+ * тикет #13) — перенесены из прототипа, не подключением прототипа.
+ */
+@theme {
+  --color-paper: #faf9f6;
+  --color-card: #ffffff;
+  --color-line: #e7e3da;
+  --color-ink: #37352f;
+  --color-muted: #8a857b;
+  --color-faint: #b7b1a4;
+  --color-sage: #5f8575;
+  --color-sage-deep: #4c6f60;
+  --color-sage-soft: #edf3f0;
+  --color-clay: #c4714b;
+  --color-clay-deep: #a85a38;
+  --color-clay-soft: #faf1ec;
+  --color-warmgray: #f3f1ec;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* времена — всегда табличные цифры (правило #13) */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/* поле ввода мультиввода из прототипа admin.html */
+.field {
+  width: 100%;
+  border: 1px solid var(--color-line);
+  background: var(--color-card);
+  border-radius: 12px;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 14.5px;
+  color: var(--color-ink);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.field:focus-visible {
+  border-color: var(--color-sage);
+  box-shadow: 0 0 0 3px rgba(95, 133, 117, 0.25);
+}
+
+.field::placeholder {
+  color: var(--color-faint);
+}
+
+.field:user-invalid {
+  border-color: var(--color-clay);
+}
