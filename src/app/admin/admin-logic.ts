@@ -1,3 +1,5 @@
+import { formatInterval } from '@/lib/time/display';
+
 // Чистая логика админ-страницы (ADR-004: UI тонкий, правил не содержит).
 // Право veto остаётся за сервером: эти функции только объясняют пользователю
 // уже состоявшийся ответ API. Локальная проверка пересечения повторяет
@@ -88,4 +90,73 @@ export function findOverlappingSlot<T extends SlotLike>(
   return slots.find(
     (s) => new Date(s.startsAt).getTime() < end && new Date(s.endsAt).getTime() > start,
   );
+}
+
+// ── Брони (тикет #8) ─────────────────────────────────────────────────────────
+
+/** Бронь в JSON-форме контракта (Booking из models.tsp) — поля, нужные карточке. */
+export interface BookingLike {
+  id: string;
+  slotId: string;
+  startsAt: string;
+  endsAt: string;
+  bookerName: string;
+  bookerContact: string;
+  comment?: string;
+}
+
+/**
+ * Карточка брони для рендера: все надписи (кроме метки зоны на всю секцию)
+ * готовы заранее на сервере в APP_TZ (ADR-009) — клиент ничего не форматирует.
+ */
+export interface BookingCard {
+  id: string;
+  bookerName: string;
+  bookerContact: string;
+  comment: string | null;
+  /** «вт, 10 ноября · 10:30–11:00» — formatInterval макета admin.html. */
+  timeLabel: string;
+}
+
+/**
+ * Карточки броней секции «Брони»; null (само-фетч не удался) проходит
+ * насквозь — по нему рендерится карточка повтора, как у интервалов.
+ * Порядок сохраняется от API (GET /bookings — по возрастанию начала слота).
+ */
+export function buildBookingCards(
+  bookings: readonly BookingLike[] | null,
+  appTz: string,
+): BookingCard[] | null {
+  if (bookings === null) return null;
+  return bookings.map((b) => ({
+    id: b.id,
+    bookerName: b.bookerName,
+    bookerContact: b.bookerContact,
+    comment: b.comment ?? null,
+    timeLabel: formatInterval(b.startsAt, b.endsAt, appTz),
+  }));
+}
+
+/** Исход попытки отмены брони: чему верит UI после ответа API. */
+export type CancelOutcome = 'cancelled' | 'already-gone' | 'unknown';
+
+/**
+ * Разбор ошибки отмены (ADR-005): контракт DELETE /api/v1/bookings/{id} кроме
+ * 204 описывает только 404 — бронь уже отменена (другое окно или удалённый
+ * вместе с интервалом слот). Остальное — неизвестные отказы.
+ */
+export function cancelOutcomeFromApiError(error: unknown): Exclude<CancelOutcome, 'cancelled'> {
+  const body = (error as ErrorEnvelopeLike | null)?.error;
+  return body?.code === 'NOT_FOUND' ? 'already-gone' : 'unknown';
+}
+
+/**
+ * Текст уведомления после попытки отмены; null — уведомление не нужно
+ * (успех виден в самом списке после refresh, сетевой сбой лечится тем же
+ * refresh по паттерну DeleteSlotButton).
+ */
+export function cancelNoticeText(outcome: CancelOutcome): string | null {
+  return outcome === 'already-gone'
+    ? 'Бронь уже отменена — возможно, в другом окне. Список показывает актуальное состояние.'
+    : null;
 }

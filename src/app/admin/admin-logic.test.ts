@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { adminWindow, findOverlappingSlot, outcomeFromApiError, slotStatus } from './admin-logic';
+import {
+  adminWindow,
+  buildBookingCards,
+  cancelNoticeText,
+  cancelOutcomeFromApiError,
+  findOverlappingSlot,
+  outcomeFromApiError,
+  slotStatus,
+  type BookingLike,
+} from './admin-logic';
 
 // Шов 3 (unit): чистая логика админ-страницы (ADR-004: тонкий UI) —
 // статус слота для бейджа макета, разбор конверта ошибок (ADR-005) и
@@ -117,5 +126,87 @@ describe('findOverlappingSlot', () => {
     expect(
       findOverlappingSlot({ startsAt: '2026-11-11T09:30:00Z', endsAt: '2026-11-11T10:00:00Z' }, []),
     ).toBeUndefined();
+  });
+});
+
+// Бронь в JSON-форме контракта (Booking из models.tsp) — только поля карточки.
+const BOOKING = {
+  id: 'booking-1',
+  slotId: 'slot-1',
+  startsAt: '2026-11-10T07:30:00.000Z',
+  endsAt: '2026-11-10T08:00:00.000Z',
+  bookerName: 'Мария Иванова',
+  bookerContact: 'maria@example.com',
+  comment: 'Хочу обсудить сотрудничество',
+  createdAt: '2026-11-07T10:00:00.000Z',
+};
+
+describe('buildBookingCards', () => {
+  it('карточка брони: интервал в APP_TZ и поля посетителя', () => {
+    expect(buildBookingCards([BOOKING], 'Europe/Moscow')).toEqual([
+      {
+        id: 'booking-1',
+        bookerName: 'Мария Иванова',
+        bookerContact: 'maria@example.com',
+        comment: 'Хочу обсудить сотрудничество',
+        timeLabel: 'вт, 10 ноября · 10:30–11:00',
+      },
+    ]);
+  });
+
+  it('бронь без комментария — comment: null, не пустая строка', () => {
+    const withoutComment: BookingLike = { ...BOOKING };
+    delete withoutComment.comment; // сервер не отдаёт ключ при null (serializeBooking)
+    expect(buildBookingCards([withoutComment], 'Europe/Moscow')).toEqual([
+      {
+        id: 'booking-1',
+        bookerName: 'Мария Иванова',
+        bookerContact: 'maria@example.com',
+        comment: null,
+        timeLabel: 'вт, 10 ноября · 10:30–11:00',
+      },
+    ]);
+  });
+
+  it('порядок сервера сохраняется (сортировка — задача API, FR-002)', () => {
+    const second = { ...BOOKING, id: 'booking-2', startsAt: '2026-11-12T07:00:00.000Z' };
+    expect(buildBookingCards([BOOKING, second], 'Europe/Moscow')?.map((c) => c.id)).toEqual([
+      'booking-1',
+      'booking-2',
+    ]);
+  });
+
+  it('null (само-фетч не удался) и пустой список проходят насквозь', () => {
+    expect(buildBookingCards(null, 'Europe/Moscow')).toBeNull();
+    expect(buildBookingCards([], 'Europe/Moscow')).toEqual([]);
+  });
+});
+
+describe('cancelOutcomeFromApiError', () => {
+  it('NOT_FOUND — бронь уже не существует (отменена в другом окне)', () => {
+    expect(
+      cancelOutcomeFromApiError({ error: { code: 'NOT_FOUND', message: 'Бронь не найдена' } }),
+    ).toBe('already-gone');
+  });
+
+  it('чужой код и мусорная форма — unknown', () => {
+    expect(
+      cancelOutcomeFromApiError({ error: { code: 'SLOT_OVERLAP', message: 'Пересечение' } }),
+    ).toBe('unknown');
+    expect(cancelOutcomeFromApiError(null)).toBe('unknown');
+    expect(cancelOutcomeFromApiError({ foo: 1 })).toBe('unknown');
+  });
+});
+
+describe('cancelNoticeText', () => {
+  it('already-gone — русский текст с причиной', () => {
+    expect(cancelNoticeText('already-gone')).toBe(
+      'Бронь уже отменена — возможно, в другом окне. Список показывает актуальное состояние.',
+    );
+  });
+
+  it('остальные исходы — без уведомления: достаточно refresh', () => {
+    expect(cancelNoticeText('unknown')).toBeNull();
+    expect(cancelNoticeText('cancelled')).toBeNull();
   });
 });
