@@ -14,6 +14,7 @@
 | Контракт (TypeSpec)  | Единственный источник истины API: каталог `contract/`. Из него генерируются OpenAPI-спецификация, типы SDK и Zod-схемы. См. ADR-010.                       |
 | OpenAPI-спецификация | `openapi.yaml`; генерируется из TypeSpec, коммитится в репозиторий.                                                                                        |
 | SDK                  | Сгенерированный клиент (`openapi-typescript` + `openapi-fetch`) в `src/generated/`; единственный способ обращения UI к API.                                |
+| Drift-check          | Проверка синхронности контракта и артефактов: регенерация + `git diff --exit-code -- src/generated/` в `make lint`. См. ADR-010.                           |
 | Конверт ошибок       | Единая форма ошибки API: `{"error": {"code", "message", "details"?}}`; коды SCREAMING_SNAKE_CASE, сообщения на русском. См. ADR-005.                       |
 | WAL                  | Write-Ahead Logging — режим SQLite, допускающий чтение во время записи.                                                                                    |
 | Шов тестирования     | Уровень, на котором пишутся тесты: шов 1 — API-интеграция (Vitest, основной), шов 2 — Playwright e2e, шов 3 — unit чистых функций.                         |

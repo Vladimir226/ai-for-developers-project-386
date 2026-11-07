@@ -1,0 +1,366 @@
+openapi: 3.0.0
+info:
+  title: Book-a-Call API
+  version: 1.0.0
+  description: |-
+    REST API «Запись на звонок».
+
+    ADR-010: TypeSpec — единственный источник истины API. OpenAPI, типы SDK и
+    Zod-схемы генерируются (`npm run contract:gen`) в `src/generated/` и
+    коммитятся. Сервер реализуется по контракту вручную (Route Handlers) и
+    проверяется integration-тестами, парсящими ответы сгенерированными схемами.
+
+    Время — ISO-8601 UTC (ADR-009). AuthN нет (ADR-003). Версионирование —
+    префикс /api/v1 (ломающие изменения — новый префикс).
+    GET /api/health сюда не входит (инфраструктурный, без версии).
+tags: []
+paths:
+  /api/v1/bookings:
+    get:
+      operationId: listBookings
+      summary: Список броней
+      description: Список броней владельца.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingList'
+    post:
+      operationId: createBooking
+      summary: Забронировать слот
+      description: 'Забронировать слот: ровно одна активная бронь на слот (NFR-002). 404 — слота нет; 409 — `SLOT_ALREADY_BOOKED` или `SLOT_IN_PAST`.'
+      parameters: []
+      responses:
+        '201':
+          description: 201-ответ `POST /api/v1/bookings` — созданная бронь.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingCreated'
+        '404':
+          description: 404 — ресурс не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: '409 — конфликт состояния: `SLOT_OVERLAP`, `SLOT_ALREADY_BOOKED`, `SLOT_IN_PAST`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: 422 — ошибка валидации полей.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+  /api/v1/bookings/{id}:
+    delete:
+      operationId: deleteBooking
+      summary: Отменить бронь
+      description: Отменить бронь — слот снова становится свободным.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '404':
+          description: 404 — ресурс не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/slots:
+    get:
+      operationId: listSlots
+      summary: Слоты периода
+      description: 'Слоты периода: `view=free` — только свободные будущие (публичная страница), `view=all` — все интервалы, включая забронированные и прошедшие (админ, FR-002). `from`/`to` опциональны.'
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Начало периода (ISO-8601 UTC); по умолчанию — сейчас.
+          schema:
+            type: string
+            format: date-time
+          explode: false
+        - name: to
+          in: query
+          required: false
+          description: Конец периода (ISO-8601 UTC); по умолчанию — сейчас + 31 день.
+          schema:
+            type: string
+            format: date-time
+          explode: false
+        - name: view
+          in: query
+          required: false
+          description: Режим выборки; по умолчанию `free`.
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SlotView'
+            default: free
+          explode: false
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotList'
+        '422':
+          description: 422 — ошибка валидации полей.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: createSlot
+      summary: Опубликовать интервал
+      description: 'Опубликовать интервал: `startsAt` в будущем, `endsAt` > `startsAt` (ADR-008, ADR-009). 409 — пересечение с существующим интервалом (`SLOT_OVERLAP`).'
+      parameters: []
+      responses:
+        '201':
+          description: 201-ответ `POST /api/v1/slots` — созданный слот.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotCreated'
+        '409':
+          description: '409 — конфликт состояния: `SLOT_OVERLAP`, `SLOT_ALREADY_BOOKED`, `SLOT_IN_PAST`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: 422 — ошибка валидации полей.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSlotRequest'
+  /api/v1/slots/{id}:
+    delete:
+      operationId: deleteSlot
+      summary: Удалить интервал
+      description: Удалить интервал вместе с активной бронью (ADR-008).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '404':
+          description: 404 — ресурс не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  schemas:
+    Booking:
+      type: object
+      required:
+        - id
+        - slotId
+        - startsAt
+        - endsAt
+        - bookerName
+        - bookerContact
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Идентификатор брони (UUID).
+        slotId:
+          type: string
+          format: uuid
+          description: Идентификатор забронированного слота.
+        startsAt:
+          type: string
+          format: date-time
+          description: Начало звонка (копия из слота), ISO-8601 UTC.
+        endsAt:
+          type: string
+          format: date-time
+          description: Конец звонка (копия из слота), ISO-8601 UTC.
+        bookerName:
+          type: string
+          description: Имя бронирующего.
+        bookerContact:
+          type: string
+          description: Контакт для связи (телефон/мессенджер/email).
+        comment:
+          type: string
+          description: Комментарий к брони (необязателен).
+        createdAt:
+          type: string
+          format: date-time
+          description: Момент создания брони, ISO-8601 UTC.
+      description: Бронь звонка на слот.
+    BookingCreated:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Booking'
+      description: 201-ответ `POST /api/v1/bookings` — созданная бронь.
+    BookingList:
+      type: object
+      required:
+        - bookings
+      properties:
+        bookings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+      description: Тело ответа `GET /api/v1/bookings`.
+    CreateBookingRequest:
+      type: object
+      required:
+        - slotId
+        - bookerName
+        - bookerContact
+      properties:
+        slotId:
+          type: string
+          format: uuid
+          description: Идентификатор бронируемого слота.
+        bookerName:
+          type: string
+          description: Имя бронирующего.
+        bookerContact:
+          type: string
+          description: Контакт для связи.
+        comment:
+          type: string
+          description: Комментарий (необязателен).
+      description: Тело запроса `POST /api/v1/bookings`.
+    CreateSlotRequest:
+      type: object
+      required:
+        - startsAt
+        - endsAt
+      properties:
+        startsAt:
+          type: string
+          format: date-time
+          description: Начало интервала, ISO-8601 UTC; в будущем.
+        endsAt:
+          type: string
+          format: date-time
+          description: Конец интервала, ISO-8601 UTC; строго позже начала.
+      description: Тело запроса `POST /api/v1/slots`.
+    ErrorBody:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: Человекочитаемое сообщение (ru).
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationErrorItem'
+          description: Дополнительные машиночитательные данные; для `VALIDATION_ERROR` — список невалидных полей.
+      description: Тело ошибки (ADR-005).
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_ERROR
+        - NOT_FOUND
+        - SLOT_OVERLAP
+        - SLOT_ALREADY_BOOKED
+        - SLOT_IN_PAST
+      description: 'Стабильные машинные коды ошибок API (ADR-005): клиент интерпретирует ошибки только по ним.'
+    ErrorEnvelope:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+      description: 'Конверт ошибок API (ADR-005): `{"error": {"code", "message", "details"?}}`.'
+    Slot:
+      type: object
+      required:
+        - id
+        - startsAt
+        - endsAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Идентификатор слота (UUID).
+        startsAt:
+          type: string
+          format: date-time
+          description: Начало интервала, ISO-8601 UTC.
+        endsAt:
+          type: string
+          format: date-time
+          description: Конец интервала, ISO-8601 UTC; строго позже начала (ADR-008).
+      description: Опубликованный интервал времени, доступный для бронирования.
+    SlotCreated:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Slot'
+      description: 201-ответ `POST /api/v1/slots` — созданный слот.
+    SlotList:
+      type: object
+      required:
+        - slots
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Slot'
+      description: Тело ответа `GET /api/v1/slots`.
+    SlotView:
+      type: string
+      enum:
+        - free
+        - all
+      description: Режим выборки слотов (FR-002).
+    ValidationErrorItem:
+      type: object
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+          description: Имя невалидного поля (camelCase, ADR-006).
+        message:
+          type: string
+          description: Человекочитаемое сообщение (ru).
+      description: Элемент `error.details` для `VALIDATION_ERROR`.
+servers:
+  - url: /
+    description: UI и API живут в одном приложении — self-fetch (ADR-004)
+    variables: {}
