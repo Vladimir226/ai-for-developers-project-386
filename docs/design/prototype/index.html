@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Запись на звонок — прототип публичной страницы</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @theme {
+        --color-paper: #faf9f6;
+        --color-card: #ffffff;
+        --color-line: #e7e3da;
+        --color-ink: #37352f;
+        --color-muted: #8a857b;
+        --color-faint: #b7b1a4;
+        --color-sage: #5f8575;
+        --color-sage-deep: #4c6f60;
+        --color-sage-soft: #edf3f0;
+        --color-clay: #c4714b;
+        --color-clay-deep: #a85a38;
+        --color-clay-soft: #faf1ec;
+        --color-warmgray: #f3f1ec;
+        --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+      }
+    </style>
+    <style>
+      body {
+        font-variant-numeric: tabular-nums;
+      }
+      [data-states][hidden] {
+        display: none;
+      }
+
+      .cal-day {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 7px 2px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          background-color 0.15s;
+      }
+      .cal-day b {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.1;
+      }
+      .cal-day .cal-count {
+        font-size: 10.5px;
+        font-weight: 600;
+        color: #5f8575;
+        line-height: 1;
+        min-height: 13px;
+      }
+      .cal-day:hover {
+        border-color: #5f8575;
+      }
+      .cal-day.zero .cal-count {
+        color: #b7b1a4;
+      }
+      .cal-day.off {
+        cursor: default;
+        color: #d6d1c6;
+      }
+      .cal-day.off b {
+        color: #d6d1c6;
+      }
+      .cal-day.off .cal-count {
+        visibility: hidden;
+      }
+      .cal-day.off:hover {
+        border-color: transparent;
+      }
+      .cal-day.on {
+        background: #5f8575;
+        border-color: #5f8575;
+      }
+      .cal-day.on b {
+        color: #ffffff;
+      }
+      .cal-day.on .cal-count {
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .cal-day.today b {
+        position: relative;
+      }
+      .cal-day.today b::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: -6px;
+        width: 4px;
+        height: 4px;
+        border-radius: 999px;
+        background: #5f8575;
+      }
+      .cal-day.on.today b::after {
+        background: #ffffff;
+      }
+
+      .slot-btn {
+        border: 1px solid #e7e3da;
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 11px 10px;
+        font-size: 14.5px;
+        font-weight: 600;
+        text-align: center;
+        transition:
+          border-color 0.15s,
+          background-color 0.15s;
+        cursor: pointer;
+        width: 100%;
+      }
+      .slot-btn:hover {
+        border-color: #5f8575;
+      }
+      .slot-btn.slot-on {
+        border-color: #5f8575;
+        background: #edf3f0;
+        box-shadow: 0 0 0 1px #5f8575 inset;
+      }
+
+      /* Пустое состояние прототипа: календарь без свободных окон */
+      body[data-state='empty'] .cal-day {
+        pointer-events: none;
+      }
+      body[data-state='empty'] .cal-day:not(.off) {
+        color: #b7b1a4;
+      }
+      body[data-state='empty'] .cal-day:not(.off) b {
+        color: #b7b1a4;
+      }
+      body[data-state='empty'] .cal-count {
+        visibility: hidden;
+      }
+      /* Ошибка прототипа: занятый слот исчезает из списка */
+      body[data-state='error'] [data-taken] {
+        display: none;
+      }
+
+      .state-btn {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body class="bg-paper text-ink font-sans antialiased min-h-screen flex flex-col">
+    <!-- ПЕРЕКЛЮЧАТЕЛЬ СОСТОЯНИЙ — только для прототипа, не часть дизайна -->
+    <div data-proto class="border-b border-dashed border-line bg-warmgray/60">
+      <div
+        class="mx-auto max-w-6xl px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted"
+      >
+        <span class="font-semibold uppercase tracking-wider">Прототип · состояние:</span>
+        <button
+          data-state-btn="normal"
+          class="px-2 py-0.5 rounded-md border border-line bg-card state-btn"
+        >
+          обычное
+        </button>
+        <button
+          data-state-btn="empty"
+          class="px-2 py-0.5 rounded-md border border-transparent state-btn"
+        >
+          пустое
+        </button>
+        <button
+          data-state-btn="success"
+          class="px-2 py-0.5 rounded-md border border-transparent state-btn"
+        >
+          успех
+        </button>
+        <button
+          data-state-btn="error"
+          class="px-2 py-0.5 rounded-md border border-transparent state-btn"
+        >
+          ошибка SLOT_ALREADY_BOOKED
+        </button>
+      </div>
+    </div>
+
+    <header class="border-b border-line bg-card/70">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
+        <a href="#" class="flex items-center gap-2.5 min-w-0">
+          <span class="grid place-items-center size-9 rounded-xl bg-sage-soft text-sage">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M8 2v4M16 2v4M3 10h18" />
+              <rect x="3" y="4" width="18" height="18" rx="4" />
+              <path d="M9.5 15.5c.6.8 1.5 1.2 2.5 1.2s1.9-.4 2.5-1.2" />
+            </svg>
+          </span>
+          <span class="font-extrabold tracking-tight text-[17px] whitespace-nowrap"
+            >Запись на звонок</span
+          >
+        </a>
+        <a
+          href="events.html"
+          class="text-[13.5px] sm:text-sm font-medium text-muted hover:text-sage transition-colors whitespace-nowrap"
+          >Предстоящие события</a
+        >
+        <a
+          href="admin.html"
+          class="hidden md:inline text-sm font-medium text-muted hover:text-sage transition-colors"
+          >Панель владельца&nbsp;&rarr;</a
+        >
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-6xl px-4 sm:px-6 pt-8 sm:pt-12 pb-16 flex-1">
+      <div class="grid lg:grid-cols-12 gap-8 lg:gap-10">
+        <!-- Левая колонка: интро -->
+        <aside class="lg:col-span-3">
+          <div class="lg:sticky lg:top-8">
+            <p class="text-[13px] font-semibold uppercase tracking-[0.14em] text-sage">
+              Бронирование
+            </p>
+            <h1
+              class="mt-3 text-[30px] leading-[1.14] sm:text-[34px] font-extrabold tracking-tight"
+            >
+              Запишитесь на&nbsp;звонок
+            </h1>
+            <p class="mt-4 text-[15px] leading-relaxed text-muted">
+              Выберите день в календаре, окно и оставьте контакты. Бронь подтверждается сразу после
+              отправки формы.
+            </p>
+
+            <dl class="mt-7 space-y-3 text-sm">
+              <div class="flex items-center gap-3">
+                <svg
+                  class="shrink-0 text-sage"
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+                <dt class="text-ink font-medium">До 30 минут</dt>
+              </div>
+              <div class="flex items-center gap-3">
+                <svg
+                  class="shrink-0 text-sage"
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2z"
+                  />
+                </svg>
+                <dt class="text-ink font-medium">Звонок по телефону или видеосвязи</dt>
+              </div>
+              <div class="flex items-center gap-3">
+                <svg
+                  class="shrink-0 text-sage"
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="4" />
+                  <path d="M8 2v4M16 2v4M3 10h18" />
+                </svg>
+                <dt class="text-ink font-medium">Запись открыта на&nbsp;14&nbsp;дней вперёд</dt>
+              </div>
+            </dl>
+
+            <p class="mt-8 text-[13px] leading-relaxed text-muted border-l-2 border-line pl-4">
+              Все времена — <span class="font-semibold text-ink">Москва, MSK (UTC+3)</span>. Слот
+              закрепляется за первым, кто завершил бронирование.
+            </p>
+          </div>
+        </aside>
+
+        <!-- Средняя колонка: календарь -->
+        <section data-states="normal empty error" aria-label="Календарь" class="lg:col-span-5">
+          <div
+            class="rounded-2xl border border-line bg-card p-4 sm:p-6 shadow-[0_1px_3px_rgba(55,53,47,0.04)]"
+          >
+            <div class="flex items-baseline justify-between">
+              <h2 class="text-[17px] font-bold tracking-tight">ноябрь 2026</h2>
+              <span class="text-[12px] text-muted">окна на 14 дней вперёд</span>
+            </div>
+
+            <div
+              class="mt-4 grid grid-cols-7 gap-1 text-center text-[11.5px] font-semibold text-muted"
+            >
+              <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span
+              ><span>сб</span><span>вс</span>
+            </div>
+            <div
+              id="calendar"
+              class="mt-1.5 grid grid-cols-7 gap-1"
+              role="grid"
+              aria-label="Дни ноября 2026"
+            ></div>
+
+            <p class="mt-4 flex items-center gap-2 text-[12px] text-muted">
+              <span class="inline-block size-2 rounded-full bg-sage"></span> — сегодня; под числом —
+              количество свободных окон
+            </p>
+          </div>
+        </section>
+
+        <!-- Правая колонка: слоты выбранного дня + форма -->
+        <div class="lg:col-span-4 space-y-6">
+          <!-- ОШИБКА: SLOT_ALREADY_BOOKED -->
+          <section
+            data-states="error"
+            hidden
+            aria-label="Ошибка бронирования"
+            class="rounded-2xl border border-clay/40 bg-clay-soft p-5"
+          >
+            <div class="flex gap-3.5">
+              <span
+                class="grid place-items-center size-9 shrink-0 rounded-full bg-clay/15 text-clay"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                >
+                  <path d="M12 8v5M12 16.5v.01" />
+                  <path
+                    d="M10.3 3.9 2.5 17.4A1.9 1.9 0 0 0 4.2 20.3h15.6a1.9 1.9 0 0 0 1.7-2.9L13.7 3.9a1.9 1.9 0 0 0-3.4 0z"
+                  />
+                </svg>
+              </span>
+              <div>
+                <h2 class="font-bold text-clay-deep">Это время только что заняли</h2>
+                <p class="mt-1 text-[13.5px] leading-relaxed text-clay-deep/80">
+                  Другой посетитель забронировал слот раньше вас. Список обновлён — выберите другое
+                  окно.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- СЛОТЫ ВЫБРАННОГО ДНЯ -->
+          <section
+            data-states="normal error"
+            aria-label="Окна на выбранный день"
+            class="rounded-2xl border border-line bg-card p-5 shadow-[0_1px_3px_rgba(55,53,47,0.04)]"
+          >
+            <div class="flex items-baseline justify-between gap-3">
+              <h2 class="text-[16px] font-bold tracking-tight" data-day-title>
+                вторник, 10 ноября
+              </h2>
+              <span class="text-[12px] text-muted whitespace-nowrap">MSK (UTC+3)</span>
+            </div>
+            <div data-slot-list class="mt-4 grid gap-2.5"></div>
+            <p data-day-empty hidden class="mt-2 text-[13.5px] leading-relaxed text-muted">
+              На этот день свободных окон нет — выберите другой день в календаре.
+            </p>
+          </section>
+
+          <!-- ФОРМА БРОНИРОВАНИЯ -->
+          <section
+            data-states="normal error"
+            id="booking-form"
+            hidden
+            aria-label="Форма бронирования"
+            class="rounded-2xl border border-line bg-card p-5 shadow-[0_1px_3px_rgba(55,53,47,0.04)]"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="text-[16px] font-bold tracking-tight">Ваша бронь</h2>
+                <p class="mt-1.5 text-[13.5px] text-muted">
+                  <span data-selected-date>вторник, 10 ноября</span> ·
+                  <strong class="text-ink font-semibold" data-selected-time>10:30–11:00</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="text-[12.5px] font-medium text-muted hover:text-sage transition-colors shrink-0 pt-0.5"
+                id="reset-slot"
+              >
+                Изменить время
+              </button>
+            </div>
+
+            <form class="mt-5 grid gap-4" onsubmit="return false;">
+              <div>
+                <label for="name" class="block text-[13px] font-semibold text-ink mb-1.5"
+                  >Ваше имя</label
+                >
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  value="Мария Иванова"
+                  required
+                  class="w-full rounded-xl border border-line bg-card px-3.5 h-11 text-[15px] placeholder:text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 focus-visible:border-sage transition"
+                />
+              </div>
+              <div>
+                <label for="contact" class="block text-[13px] font-semibold text-ink mb-1.5"
+                  >Телефон или email</label
+                >
+                <input
+                  id="contact"
+                  name="contact"
+                  type="text"
+                  placeholder="+7 900 000-00-00"
+                  required
+                  class="w-full rounded-xl border border-line bg-card px-3.5 h-11 text-[15px] placeholder:text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 focus-visible:border-sage transition"
+                />
+              </div>
+              <div>
+                <label for="comment" class="block text-[13px] font-semibold text-ink mb-1.5"
+                  >Комментарий <span class="font-normal text-muted">· необязательно</span></label
+                >
+                <textarea
+                  id="comment"
+                  name="comment"
+                  rows="2"
+                  placeholder="О чём хотите поговорить"
+                  class="w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] placeholder:text-faint resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-sage/40 focus-visible:border-sage transition"
+                ></textarea>
+              </div>
+              <button
+                type="submit"
+                class="h-12 rounded-xl bg-sage hover:bg-sage-deep active:translate-y-px text-white text-[15px] font-semibold transition"
+              >
+                Забронировать звонок
+              </button>
+            </form>
+          </section>
+
+          <!-- ПУСТОЕ СОСТОЯНИЕ -->
+          <section
+            data-states="empty"
+            hidden
+            aria-label="Нет свободных окон"
+            class="rounded-2xl border border-line bg-card px-5 py-12 text-center shadow-[0_1px_3px_rgba(55,53,47,0.04)]"
+          >
+            <span
+              class="mx-auto grid place-items-center size-14 rounded-full bg-sage-soft text-sage"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M8 2v4M16 2v4M3 10h18" />
+                <rect x="3" y="4" width="18" height="18" rx="4" />
+                <path d="M9 14h6M9 17.5h3" />
+              </svg>
+            </span>
+            <h2 class="mt-5 text-[18px] font-bold tracking-tight">Свободных окон пока нет</h2>
+            <p class="mt-2 text-[13.5px] leading-relaxed text-muted max-w-[34ch] mx-auto">
+              Владелец регулярно добавляет новое время. Загляните на эту страницу позже.
+            </p>
+          </section>
+
+          <!-- УСПЕХ: подтверждение -->
+          <section
+            data-states="success"
+            hidden
+            aria-label="Бронь подтверждена"
+            class="rounded-2xl border border-sage/30 bg-card p-5 sm:p-6 shadow-[0_1px_3px_rgba(55,53,47,0.04)]"
+          >
+            <div class="flex gap-4">
+              <span
+                class="grid place-items-center size-11 shrink-0 rounded-full bg-sage text-white"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+              <div>
+                <h2 class="text-[20px] font-extrabold tracking-tight">Бронь подтверждена</h2>
+                <p class="mt-1 text-[14px] text-muted">
+                  До связи! Напоминание придёт на указанный контакт.
+                </p>
+              </div>
+            </div>
+
+            <dl
+              class="mt-5 rounded-xl border border-line bg-paper px-4 py-3.5 grid gap-x-6 gap-y-2.5 text-[14px]"
+            >
+              <div class="flex justify-between gap-3">
+                <dt class="text-muted">Дата</dt>
+                <dd class="font-semibold text-right">вторник, 10 ноября</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-muted">Время</dt>
+                <dd class="font-semibold">10:30–11:00 · MSK</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-muted">Имя</dt>
+                <dd class="font-semibold">Мария Иванова</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-muted">Контакт</dt>
+                <dd class="font-semibold">maria@example.com</dd>
+              </div>
+            </dl>
+
+            <div class="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                class="h-11 px-5 rounded-xl border border-line hover:border-sage hover:text-sage text-[14px] font-semibold transition"
+              >
+                Забронировать ещё
+              </button>
+              <a
+                href="events.html"
+                class="inline-flex h-11 items-center px-5 rounded-xl bg-sage hover:bg-sage-deep text-white text-[14px] font-semibold transition"
+              >
+                Предстоящие события
+              </a>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <footer class="border-t border-line">
+      <div
+        class="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between text-[12.5px] text-muted"
+      >
+        <span>«Запись на звонок» · прототип дизайна</span>
+        <span>Время — Москва, MSK (UTC+3)</span>
+      </div>
+    </footer>
+
+    <script>
+      // Данные прототипа: слоты на ближайшие 14 дней (7–20 ноября 2026)
+      const SLOTS = {
+        10: ['10:00–10:30', '10:30–11:00', '11:00–11:30'],
+        11: ['15:00–15:30', '15:30–16:00'],
+        14: ['10:00–10:30'],
+        17: ['12:00–12:30', '12:30–13:00'],
+        19: ['09:30–10:00', '10:00–10:30', '16:00–16:30'],
+      };
+      const TODAY = 7; // 7 ноября 2026
+      const WINDOW_END = 20; // запись открыта на 14 дней вперёд
+      const TAKEN = '10:30–11:00'; // слот, «занятый» в состоянии ошибки
+
+      const dayTitle = (d) =>
+        new Date(2026, 10, d).toLocaleDateString('ru-RU', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        });
+
+      // Календарь: ноябрь 2026, неделя с понедельника (26 окт – 6 дек)
+      const cal = document.getElementById('calendar');
+      let day = new Date(2026, 10, 1);
+      day.setDate(1 - ((day.getDay() + 6) % 7));
+      for (let i = 0; i < 42; i++) {
+        const inMonth = day.getMonth() === 10;
+        const d = day.getDate();
+        const inWindow = inMonth && d >= TODAY && d <= WINDOW_END;
+        const slots = inWindow ? SLOTS[d] || [] : null;
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className =
+          'cal-day' +
+          (inWindow ? '' : ' off') +
+          (slots && slots.length === 0 ? ' zero' : '') +
+          (d === 10 ? ' on' : '') +
+          (inMonth && d === TODAY ? ' today' : '');
+        el.dataset.day = inMonth ? d : '';
+        el.setAttribute(
+          'aria-label',
+          inWindow
+            ? dayTitle(d) +
+                (slots && slots.length
+                  ? ', свободных окон: ' + slots.length
+                  : ', свободных окон нет')
+            : '',
+        );
+        el.innerHTML =
+          '<b>' +
+          d +
+          "</b><span class='cal-count'>" +
+          (slots && slots.length
+            ? slots.length +
+              ' ' +
+              (slots.length === 1 ? 'окно' : slots.length < 5 ? 'окна' : 'окон')
+            : inWindow
+              ? '0'
+              : '') +
+          '</span>';
+        if (inWindow) el.addEventListener('click', () => selectDay(d, el));
+        cal.appendChild(el);
+        day.setDate(d + 1);
+      }
+
+      // Выбор дня -> список слотов
+      const list = document.querySelector('[data-slot-list]');
+      const dayEmpty = document.querySelector('[data-day-empty]');
+      function selectDay(d, el) {
+        document.querySelectorAll('.cal-day.on').forEach((x) => x.classList.remove('on'));
+        el.classList.add('on');
+        document.querySelector('[data-day-title]').textContent = dayTitle(d);
+        list.innerHTML = '';
+        const slots = SLOTS[d] || [];
+        dayEmpty.hidden = slots.length > 0;
+        document.getElementById('booking-form').hidden = slots.length === 0;
+        slots.forEach((t) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'slot-btn';
+          b.textContent = t;
+          if (t === TAKEN) b.dataset.taken = 'true';
+          b.addEventListener('click', () => {
+            list.querySelectorAll('.slot-btn').forEach((x) => x.classList.remove('slot-on'));
+            b.classList.add('slot-on');
+            document.querySelector('[data-selected-date]').textContent = dayTitle(d);
+            document.querySelector('[data-selected-time]').textContent = t;
+            document.getElementById('booking-form').hidden = false;
+          });
+          list.appendChild(b);
+        });
+        const first = list.querySelector('.slot-btn:not([data-taken])');
+        if (first) first.click();
+      }
+
+      document.getElementById('reset-slot').addEventListener('click', () => {
+        document
+          .querySelector('[data-day-title]')
+          .scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+
+      // Начальное состояние: выбран вторник, 10 ноября
+      selectDay(10, document.querySelector('.cal-day[data-day="10"]'));
+
+      // Переключение состояний прототипа
+      const btns = document.querySelectorAll('[data-state-btn]');
+      function setState(s) {
+        document.body.dataset.state = s;
+        btns.forEach((b) => {
+          const on = b.dataset.stateBtn === s;
+          b.classList.toggle('bg-card', on);
+          b.classList.toggle('border-line', on);
+          b.classList.toggle('border-transparent', !on);
+          b.classList.toggle('text-ink', on);
+        });
+        document.querySelectorAll('[data-states]').forEach((el) => {
+          el.hidden = !el.dataset.states.split(' ').includes(s);
+        });
+        // в состоянии ошибки занятый слот уже снят с выбора
+        if (s === 'error') {
+          const sel = list.querySelector('.slot-btn.slot-on');
+          if (sel && sel.dataset.taken) {
+            sel.classList.remove('slot-on');
+            const next = list.querySelector('.slot-btn:not([data-taken])');
+            if (next) next.click();
+          }
+        }
+      }
+      btns.forEach((b) => b.addEventListener('click', () => setState(b.dataset.stateBtn)));
+      setState('normal');
+    </script>
+  </body>
+</html>
