@@ -402,6 +402,41 @@ describe('GET /api/v1/bookings', () => {
     expect(body.bookings).toHaveLength(1);
   });
 
+  // Граница фильтра для списка владельца (#36): встреча, идущая прямо
+  // сейчас (start < now < end), — предстоящая; закончившаяся минуту назад —
+  // нет. Пиннит ожидание UI: секция «Брони» просит ?upcoming=true и
+  // показывает идущие встречи, не дожидаясь их конца.
+  it('upcoming=true: идущая прямо сейчас — предстоящая; закончившаяся минуту назад — нет', async () => {
+    const type = await seedEventTypeViaApi();
+
+    // обе сеются напрямую: продакшн-путь создаёт только будущие брони
+    const now = Date.now();
+    const db = await getDb();
+    await db.booking.createMany({
+      data: [
+        {
+          eventTypeId: type.id,
+          startsAt: new Date(now - 30 * 60 * 1000),
+          endsAt: new Date(now + 30 * 60 * 1000),
+          bookerName: 'Идёт сейчас',
+          bookerContact: 'email:now@b.co',
+        },
+        {
+          eventTypeId: type.id,
+          startsAt: new Date(now - 61 * 60 * 1000),
+          endsAt: new Date(now - 60 * 1000),
+          bookerName: 'Закончилась минуту назад',
+          bookerContact: 'email:past@b.co',
+        },
+      ],
+    });
+
+    const response = await getBookings('?upcoming=true');
+    expect(response.status).toBe(200);
+    const body = schemas.BookingList.parse(await response.json());
+    expect(body.bookings.map((booking) => booking.bookerName)).toEqual(['Идёт сейчас']);
+  });
+
   it('upcoming=yes → 422 VALIDATION_ERROR', async () => {
     const response = await getBookings('?upcoming=yes');
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bookingCardFromBooking,
   buildWorkingHoursBody,
+  cancelFailureNotice,
   countEventTypes,
   eventTypeDraftFromForm,
   eventTypeFormFromEventType,
@@ -9,6 +11,7 @@ import {
   hhmmToMinutes,
   minutesToHHMM,
   splitIssues,
+  UPCOMING_BOOKINGS_QUERY,
   validateEventTypeForm,
   validateWeekRows,
   weekRowsFromDays,
@@ -22,7 +25,9 @@ import {
 // сборка тела PUT рабочих часов и разбор конверта ошибок (ADR-005).
 // Ожидания — literals, не пересчёт. Право veto — за сервером: локальные
 // проверки только объясняют форму до отправки, серверные 422 маппятся
-// в те же ключи полей.
+// в те же ключи полей. Брони (#36): карточки предстоящих — диапазон
+// форматируется на сервере в APP_TZ (ADR-0009), фильтр «предстоящие» —
+// запросом ?upcoming=true, граница — на сервере (пиннинг — API-тесты).
 
 // ── formatDuration ───────────────────────────────────────────────────────────
 
@@ -367,5 +372,111 @@ describe('splitIssues', () => {
       ['title'],
     );
     expect(fieldErrors).toEqual({ title: 'первое' });
+  });
+});
+
+// ── брони: список предстоящих (#36) ──────────────────────────────────────────
+
+describe('UPCOMING_BOOKINGS_QUERY', () => {
+  it('секция «Брони» читает только предстоящие: ?upcoming=true', () => {
+    // фильтр — серверный (конец ≥ сейчас); UI не фильтрует сам (ADR-004)
+    expect(UPCOMING_BOOKINGS_QUERY).toEqual({ query: { upcoming: true } });
+  });
+});
+
+describe('bookingCardFromBooking', () => {
+  it('карточка: тип, длительность, диапазон в APP_TZ, имя, контакт; без комментария поля нет', () => {
+    expect(
+      bookingCardFromBooking(
+        {
+          id: 'b-1',
+          eventType: { id: 't-1', title: 'Консультация', durationMinutes: 30 },
+          startsAt: '2026-11-10T07:00:00.000Z',
+          endsAt: '2026-11-10T07:30:00.000Z',
+          bookerName: 'Мария Иванова',
+          bookerContact: 'maria@example.com',
+          createdAt: '2026-11-08T10:00:00.000Z',
+        },
+        'Europe/Moscow',
+      ),
+    ).toEqual({
+      id: 'b-1',
+      eventTypeTitle: 'Консультация',
+      durationLabel: '30 минут',
+      when: 'вт, 10 ноября · 10:00–10:30',
+      bookerName: 'Мария Иванова',
+      bookerContact: 'maria@example.com',
+    });
+  });
+
+  it('с комментарием — сохраняется; интервал через полночь — обе даты', () => {
+    const card = bookingCardFromBooking(
+      {
+        id: 'b-2',
+        eventType: { id: 't-1', title: 'Стратегия', durationMinutes: 75 },
+        startsAt: '2026-11-10T20:00:00.000Z',
+        endsAt: '2026-11-10T21:15:00.000Z',
+        bookerName: 'Пётр',
+        bookerContact: 'phone:+79160000000',
+        comment: 'Хочу обсудить сотрудничество',
+        createdAt: '2026-11-08T10:00:00.000Z',
+      },
+      'Europe/Moscow',
+    );
+    expect(card.when).toBe('вт, 10 ноября · 23:00 – ср, 11 ноября · 00:15');
+    expect(card.durationLabel).toBe('1 час 15 минут');
+    expect(card.comment).toBe('Хочу обсудить сотрудничество');
+  });
+
+  it('другая зона — тот же инстант в её настенном времени', () => {
+    const card = bookingCardFromBooking(
+      {
+        id: 'b-3',
+        eventType: { id: 't-1', title: 'Звонок', durationMinutes: 60 },
+        startsAt: '2026-11-10T07:00:00.000Z',
+        endsAt: '2026-11-10T08:00:00.000Z',
+        bookerName: 'Анна',
+        bookerContact: 'email:anna@b.co',
+        createdAt: '2026-11-08T10:00:00.000Z',
+      },
+      'UTC',
+    );
+    expect(card.when).toBe('вт, 10 ноября · 07:00–08:00');
+  });
+});
+
+describe('cancelFailureNotice', () => {
+  it('404 — бронь уже исчезла (отменена в другом окне): сообщения нет, карточку уберёт refresh', () => {
+    expect(
+      cancelFailureNotice(
+        failureFromApiError({ error: { code: 'NOT_FOUND', message: 'Бронь не найдена' } }),
+      ),
+    ).toBeNull();
+  });
+
+  it('неожидаемый для DELETE 422 VALIDATION_ERROR разбирается без падения — общее сообщение', () => {
+    expect(
+      cancelFailureNotice(
+        failureFromApiError({
+          error: { code: 'VALIDATION_ERROR', message: 'Невалидное тело запроса' },
+        }),
+      ),
+    ).toBe('не удалось отменить бронь — попробуйте ещё раз');
+  });
+
+  it('неожидаемый 409 и мусор без конверта — то же общее сообщение', () => {
+    expect(
+      cancelFailureNotice(
+        failureFromApiError({
+          error: { code: 'SLOT_ALREADY_BOOKED', message: 'время пересекается' },
+        }),
+      ),
+    ).toBe('не удалось отменить бронь — попробуйте ещё раз');
+    expect(cancelFailureNotice(failureFromApiError(null))).toBe(
+      'не удалось отменить бронь — попробуйте ещё раз',
+    );
+    expect(cancelFailureNotice(failureFromApiError({ weird: true }))).toBe(
+      'не удалось отменить бронь — попробуйте ещё раз',
+    );
   });
 });
