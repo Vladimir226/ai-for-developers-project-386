@@ -35,9 +35,5 @@ export function setupTestDatabase(): void {
   });
 }
 
-/** Чистит таблицу слотов между тестами (setup, не проверка). */
-export async function clearSlots(): Promise<void> {
-  const { getDb } = await import('@/lib/db/prisma');
-  const db = await getDb();
-  await db.slot.deleteMany();
-}
+// Хелперы очистки таблиц между тестами вернутся вместе с роутами новой
+// модели (#33): очистка booking/eventType/workingHours.

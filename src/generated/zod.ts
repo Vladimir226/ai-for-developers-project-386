@@ -1,9 +1,16 @@
 import { z } from 'zod';
 
+const BookingEventType = z
+  .object({
+    id: z.string().uuid(),
+    title: z.string().min(1).max(100),
+    durationMinutes: z.number().int().gte(15).lte(180),
+  })
+  .passthrough();
 const Booking = z
   .object({
     id: z.string().uuid(),
-    slotId: z.string().uuid(),
+    eventType: BookingEventType,
     startsAt: z.string().datetime({ offset: true }),
     endsAt: z.string().datetime({ offset: true }),
     bookerName: z.string().min(1).max(100),
@@ -15,20 +22,15 @@ const Booking = z
 const BookingList = z.object({ bookings: z.array(Booking) }).passthrough();
 const CreateBookingRequest = z
   .object({
-    slotId: z.string().uuid(),
+    eventTypeId: z.string().uuid(),
+    startsAt: z.string().datetime({ offset: true }),
     bookerName: z.string().min(1).max(100),
     bookerContact: z.string().min(5).max(200),
     comment: z.string().max(500).optional(),
   })
   .passthrough();
 const BookingCreated = Booking;
-const ErrorCode = z.enum([
-  'VALIDATION_ERROR',
-  'NOT_FOUND',
-  'SLOT_OVERLAP',
-  'SLOT_ALREADY_BOOKED',
-  'SLOT_IN_PAST',
-]);
+const ErrorCode = z.enum(['VALIDATION_ERROR', 'NOT_FOUND', 'SLOT_ALREADY_BOOKED', 'SLOT_IN_PAST']);
 const ValidationErrorItem = z.object({ field: z.string(), message: z.string() }).passthrough();
 const ErrorBody = z
   .object({
@@ -38,25 +40,44 @@ const ErrorBody = z
   })
   .passthrough();
 const ErrorEnvelope = z.object({ error: ErrorBody }).passthrough();
-const SlotView = z.enum(['free', 'all']);
-const view = SlotView.optional().default('free');
-const Slot = z
+const EventType = z
   .object({
     id: z.string().uuid(),
+    title: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    durationMinutes: z.number().int().gte(15).lte(180),
+  })
+  .passthrough();
+const EventTypeList = z.object({ eventTypes: z.array(EventType) }).passthrough();
+const EventTypeDraft = z
+  .object({
+    title: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    durationMinutes: z.number().int().gte(15).lte(180),
+  })
+  .passthrough();
+const CreateEventTypeRequest = EventTypeDraft;
+const EventTypeCreated = EventType;
+const UpdateEventTypeRequest = EventTypeDraft;
+const Slot = z
+  .object({
     startsAt: z.string().datetime({ offset: true }),
     endsAt: z.string().datetime({ offset: true }),
   })
   .passthrough();
 const SlotList = z.object({ slots: z.array(Slot) }).passthrough();
-const CreateSlotRequest = z
+const WorkingHoursDay = z
   .object({
-    startsAt: z.string().datetime({ offset: true }),
-    endsAt: z.string().datetime({ offset: true }),
+    weekday: z.number().int().gte(0).lte(6),
+    isDayOff: z.boolean(),
+    startMinutes: z.number().int().gte(0).lte(1440).optional(),
+    endMinutes: z.number().int().gte(0).lte(1440).optional(),
   })
   .passthrough();
-const SlotCreated = Slot;
+const WorkingHours = z.object({ days: z.array(WorkingHoursDay) }).passthrough();
 
 export const schemas = {
+  BookingEventType,
   Booking,
   BookingList,
   CreateBookingRequest,
@@ -65,10 +86,14 @@ export const schemas = {
   ValidationErrorItem,
   ErrorBody,
   ErrorEnvelope,
-  SlotView,
-  view,
+  EventType,
+  EventTypeList,
+  EventTypeDraft,
+  CreateEventTypeRequest,
+  EventTypeCreated,
+  UpdateEventTypeRequest,
   Slot,
   SlotList,
-  CreateSlotRequest,
-  SlotCreated,
+  WorkingHoursDay,
+  WorkingHours,
 };
