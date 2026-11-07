@@ -7,6 +7,7 @@ npm install      # зависимости (postinstall сам выполнит p
 npm run dev      # запуск: http://localhost:3000 (Next.js — бекенд и фронтенд вместе)
 npm run check    # все проверки: lint + prettier + тесты; CI гоняет то же самое (make check)
 npm test         # только тесты (vitest)
+npm run test:e2e # браузерные тесты Playwright на настоящем сервере (сборка и старт — сама команда)
 npm run lint     # только линтеры: eslint + tsc --noEmit + redocly + drift-check контракта
 ```
 
@@ -14,7 +15,7 @@ npm run lint     # только линтеры: eslint + tsc --noEmit + redocly 
 
 - `src/app/` — Next.js App Router: страницы и API-роуты (`api/health`, `api/v1/slots`)
 - `src/domain/` — доменная логика без HTTP и БД; `src/lib/` — инфраструктура: Prisma, валидация, SDK-клиент, логирование
-- `contract/` — TypeSpec-контракт API, источник истины; `npm run contract:gen` генерирует `src/generated/` (коммитится, расхождение ловит drift-check)
+- `contract/` — TypeSpec-контракт API, источник истины; `npm run contract:gen` генерирует `src/generated/` (коммитится, руками не править — расхождение ловит drift-check в CI)
 - `prisma/` — схема и миграции (SQLite + WAL)
 - CI: наш `.github/workflows/check.yml` вызывает `make check`; `hexlet-check.yml` — автогенерированный Хекслетом, не трогать
 
@@ -22,7 +23,7 @@ npm run lint     # только линтеры: eslint + tsc --noEmit + redocly 
 
 ## Коммиты
 
-Формат — Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, скоуп по вкусу — `feat(slots): …`.
+Формат — Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, скоуп по вкусу — `feat(slots): …`. Коммит реализации ссылается на закрываемый тикет: `feat: запись на свободный слот (#12)`.
 
 ## Agent skills
 
