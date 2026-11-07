@@ -13,6 +13,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "next build && playwright test",
+    "e2e:server": "node scripts/e2e-server.mjs",
     "check": "npm run lint && npm run format:check && npm test",
     "contract:compile": "cd contract && tsp compile .",
     "contract:gen": "npm run contract:compile && openapi-typescript src/generated/openapi.yaml -o src/generated/schema.d.ts && openapi-zod-client src/generated/openapi.yaml -o src/generated/zod.ts --export-schemas -t node_modules/openapi-zod-client/src/templates/schemas-only.hbs",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.65.0",
     "@redocly/cli": "^2.76.0",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^22.15.0",

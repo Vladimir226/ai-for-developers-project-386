@@ -1,7 +1,11 @@
 node_modules
 .next
 out
+# тестовые артефакты — генерируются прогонами (vitest, playwright)
 coverage
+test-results
+playwright-report
+.blob-root
 dev-data
 
 # вендорные ассеты установленных скиллов — не трогаем
