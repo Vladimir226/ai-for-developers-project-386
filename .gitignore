@@ -20,6 +20,9 @@ dev-data/
 
 # tests
 coverage/
+test-results/
+playwright-report/
+.blob-root/
 
 # misc
 *.tsbuildinfo
