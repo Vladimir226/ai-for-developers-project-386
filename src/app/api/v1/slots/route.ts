@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSlot, deleteSlot, listSlots, serializeSlot } from '@/domain/availability/slots';
+import { readJsonBody } from '@/lib/http/json-body';
 import { jsonError } from '@/lib/http/json-error';
 import { withRequestLogging } from '@/lib/http/with-request-logging';
 import { parseCreateSlotBody, parseSlotQuery } from '@/lib/validation/slot';
@@ -32,16 +33,12 @@ export const GET = withRequestLogging(async (request) => {
 });
 
 export const POST = withRequestLogging(async (request) => {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonError('VALIDATION_ERROR', 422, 'Невалидное тело запроса', [
-      { field: 'body', message: 'ожидается корректный JSON' },
-    ]);
+  const bodyResult = await readJsonBody(request);
+  if (!bodyResult.ok) {
+    return bodyResult.response;
   }
 
-  const parsed = parseCreateSlotBody(body, new Date());
+  const parsed = parseCreateSlotBody(bodyResult.body, new Date());
   if (!parsed.ok) {
     return jsonError('VALIDATION_ERROR', 422, 'Невалидное тело запроса', parsed.issues);
   }

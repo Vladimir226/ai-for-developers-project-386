@@ -209,12 +209,17 @@ components:
           description: Конец звонка (копия из слота), ISO-8601 UTC.
         bookerName:
           type: string
+          minLength: 1
+          maxLength: 100
           description: Имя бронирующего.
         bookerContact:
           type: string
+          minLength: 5
+          maxLength: 200
           description: Контакт для связи (телефон/мессенджер/email).
         comment:
           type: string
+          maxLength: 500
           description: Комментарий к брони (необязателен).
         createdAt:
           type: string
@@ -249,12 +254,17 @@ components:
           description: Идентификатор бронируемого слота.
         bookerName:
           type: string
+          minLength: 1
+          maxLength: 100
           description: Имя бронирующего.
         bookerContact:
           type: string
+          minLength: 5
+          maxLength: 200
           description: Контакт для связи.
         comment:
           type: string
+          maxLength: 500
           description: Комментарий (необязателен).
       description: Тело запроса `POST /api/v1/bookings`.
     CreateSlotRequest:

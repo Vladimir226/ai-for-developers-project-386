@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { schemas } from '@/generated/zod';
 import type { Interval } from '@/domain/availability/intervals';
+import { fromZodIssues, type FieldIssue, type ParseResult } from './zod-issues';
 
 // Валидация запросов слотов (ADR-005, ADR-009, ADR-010). Источник структуры —
 // сгенерированные из контракта Zod-схемы (`schemas.CreateSlotRequest`,
@@ -9,14 +10,6 @@ import type { Interval } from '@/domain/availability/intervals';
 // периода) и нормализация в UTC-инстанты. Тип интервала принадлежит домену.
 
 export const DEFAULT_PERIOD_DAYS = 31;
-
-/** Элемент `error.details` конверта ошибок для VALIDATION_ERROR (ADR-005). */
-export interface FieldIssue {
-  field: string;
-  message: string;
-}
-
-export type ParseResult<T> = { ok: true; value: T } | { ok: false; issues: FieldIssue[] };
 
 /** Провалидированные параметры `GET /api/v1/slots` в UTC-инстантах. */
 export interface SlotQuery {
@@ -40,14 +33,6 @@ function instant(field: string, raw: unknown, issues: FieldIssue[]): Date | unde
   return new Date(parsed.data);
 }
 
-function fromZodIssues(issues: z.ZodIssue[]): FieldIssue[] {
-  return issues.map((issue) => {
-    const field = issue.path.map(String).join('.') || 'body';
-    const message = issue.code === 'invalid_type' ? 'обязательное поле' : NOT_ISO;
-    return { field, message };
-  });
-}
-
 /**
  * Тело `POST /api/v1/slots`: структура — по контракту; `startsAt` строго
  * в будущем относительно `now`, `endsAt` строго позже `startsAt`.
@@ -55,7 +40,7 @@ function fromZodIssues(issues: z.ZodIssue[]): FieldIssue[] {
 export function parseCreateSlotBody(body: unknown, now: Date): ParseResult<Interval> {
   const shape = schemas.CreateSlotRequest.safeParse(body);
   if (!shape.success) {
-    return { ok: false, issues: fromZodIssues(shape.error.issues) };
+    return { ok: false, issues: fromZodIssues(shape.error.issues, NOT_ISO) };
   }
 
   const issues: FieldIssue[] = [];

@@ -1,5 +1,4 @@
 // Схема БД «Запись на звонок» (ADR-002): SQLite через Prisma, режим WAL.
-// Сущности приезжают вместе со своими тикетами: Slot — в #4, Booking — в #6.
 // Правила именования (§4 architecture.md): БД — snake_case, Prisma — camelCase + @map.
 
 generator client {
@@ -15,11 +14,28 @@ datasource db {
 // требует @format("uuid") для API; расхождение со сводкой §5 (cuid) осознанно
 // решено в пользу контракта — ADR-010 делает его источником истины API.
 model Slot {
-  id        String   @id @default(uuid())
-  startsAt  DateTime @map("starts_at")
-  endsAt    DateTime @map("ends_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String    @id @default(uuid())
+  startsAt  DateTime  @map("starts_at")
+  endsAt    DateTime  @map("ends_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  bookings  Booking[]
 
   @@index([startsAt])
   @@map("slots")
+}
+
+// Активная бронь слота (ADR-008): UNIQUE(slot_id) — антидубль на уровне БД,
+// истина последней инстанции (NFR-002); отмена брони — DELETE строки, слот
+// снова свободен. Удаление слота каскадно удаляет связанную бронь.
+model Booking {
+  id            String   @id @default(uuid())
+  slotId        String   @unique @map("slot_id")
+  bookerName    String   @map("booker_name")
+  bookerContact String   @map("booker_contact")
+  comment       String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@map("bookings")
 }

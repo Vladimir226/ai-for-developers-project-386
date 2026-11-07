@@ -70,17 +70,18 @@ async function createSlotSerialized(input: Interval): Promise<CreateSlotResult> 
 
 /**
  * Слоты периода: `view=all` — все интервалы окна `[from; to]` по `startsAt`;
- * `view=free` — только целиком будущие (`startsAt > now`, GLOSSARY «свободный
- * слот»). Свобода от броней появится вместе с сущностью Booking (#6): брони
- * пока нет, все слоты свободны. Сортировка — по возрастанию начала
- * (индекс starts_at, NFR-005).
+ * `view=free` — только целиком будущие (`startsAt > now`) и без активной
+ * брони (GLOSSARY «свободный слот»; брони нет — слот свободен, US-12).
+ * Сортировка — по возрастанию начала (индекс starts_at, NFR-005).
  */
 export async function listSlots(query: SlotQuery, now: Date): Promise<SlotRecord[]> {
   const db = await getDb();
 
   const windowFilter: Prisma.SlotWhereInput = { startsAt: { gte: query.from, lte: query.to } };
   const where: Prisma.SlotWhereInput =
-    query.view === 'free' ? { AND: [windowFilter, { startsAt: { gt: now } }] } : windowFilter;
+    query.view === 'free'
+      ? { AND: [windowFilter, { startsAt: { gt: now } }, { bookings: { none: {} } }] }
+      : windowFilter;
 
   return db.slot.findMany({ where, orderBy: { startsAt: 'asc' } });
 }

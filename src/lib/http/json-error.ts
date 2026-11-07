@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { z } from 'zod';
 import { schemas } from '@/generated/zod';
-import type { FieldIssue } from '@/lib/validation/slot';
+import type { FieldIssue } from '@/lib/validation/zod-issues';
 
 // Конверт ошибок API (ADR-005): {"error": {"code", "message", "details"?}}.
 // Единственный способ вернуть ошибку из Route Handlers — коды берутся из
