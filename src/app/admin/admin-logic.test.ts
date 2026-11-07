@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findOverlappingSlot, outcomeFromApiError, slotStatus } from './admin-logic';
+import { adminWindow, findOverlappingSlot, outcomeFromApiError, slotStatus } from './admin-logic';
 
 // Шов 3 (unit): чистая логика админ-страницы (ADR-004: тонкий UI) —
 // статус слота для бейджа макета, разбор конверта ошибок (ADR-005) и
@@ -27,6 +27,17 @@ describe('slotStatus', () => {
   it('идущий прямо сейчас слот — ещё не прошёл', () => {
     const slot = { id: 'slot-1', startsAt: '2026-11-10T11:00:00Z', endsAt: '2026-11-10T13:00:00Z' };
     expect(slotStatus(slot, new Set(), NOW)).toBe('free');
+  });
+});
+
+describe('adminWindow', () => {
+  it('покрывает всё: от эпохи до далёкого будущего — «все опубликованные»', () => {
+    // FR-002 «видит список всех опубликованных интервалов»: дефолтное окно
+    // API (now..now+31д) скрыло бы прошедшие и дальние интервалы
+    expect(adminWindow()).toEqual({
+      from: '1970-01-01T00:00:00.000Z',
+      to: '9999-12-31T23:59:59.999Z',
+    });
   });
 });
 

@@ -3,14 +3,14 @@ import Link from 'next/link';
 import { createServerApiClient } from '@/lib/sdk/server';
 import { getAppTz } from '@/lib/time/app-tz';
 import { tzLabel } from '@/lib/time/display';
-import { ADMIN_WINDOW_DAYS } from './admin-logic';
-import { PublishForm } from './publish-form';
-import { SlotList } from './slot-list';
+import { adminWindow } from './admin-logic';
+import { PublishForm } from './PublishForm';
+import { SlotList } from './SlotList';
 
 // Панель владельца (FR-002): чтение — RSC self-fetch через SDK (ADR-004,
 // ADR-010), мутации — клиентские компоненты тем же SDK + router.refresh().
-// Окно списка задаёт ADMIN_WINDOW_DAYS (31 день в обе стороны — зеркально
-// дефолтному периоду API, включая недавнее прошлое со статусом «Прошёл»).
+// Окно списка — adminWindow(): все опубликованные интервалы, включая
+// прошедшие (бейдж «Прошёл») и дальние планы.
 
 export const dynamic = 'force-dynamic';
 
@@ -18,13 +18,10 @@ export const metadata: Metadata = {
   title: 'Панель владельца — Запись на звонок',
 };
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 export default async function AdminPage() {
   const appTz = getAppTz();
   const now = new Date();
-  const from = new Date(now.getTime() - ADMIN_WINDOW_DAYS * MS_PER_DAY).toISOString();
-  const to = new Date(now.getTime() + ADMIN_WINDOW_DAYS * MS_PER_DAY).toISOString();
+  const { from, to } = adminWindow();
 
   const api = await createServerApiClient();
   const [slotsResult, bookingsResult] = await Promise.all([

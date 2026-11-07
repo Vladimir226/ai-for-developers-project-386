@@ -1,6 +1,6 @@
 import { countIntervals, formatInterval } from '@/lib/time/display';
 import { slotStatus, type SlotStatus } from './admin-logic';
-import { DeleteSlotButton } from './delete-slot-button';
+import { DeleteSlotButton } from './DeleteSlotButton';
 
 // Список опубликованных интервалов (серверный рендер, ADR-009: время в APP_TZ).
 // Статусы — бейджи макета #13: «Свободен» (sage), «Забронирован» и «Прошёл»

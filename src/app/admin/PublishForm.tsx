@@ -5,7 +5,12 @@ import { useRef, useState } from 'react';
 import { createApiClient } from '@/lib/sdk/client';
 import { wallTimeToUtcIso } from '@/lib/time/wall-time';
 import { countIntervals, formatInterval, formatTimeRange } from '@/lib/time/display';
-import { ADMIN_WINDOW_DAYS, findOverlappingSlot, outcomeFromApiError } from './admin-logic';
+import {
+  adminWindow,
+  findOverlappingSlot,
+  outcomeFromApiError,
+  type SubmitFailure,
+} from './admin-logic';
 
 // Мультиввод интервалов (FR-001): строки — контролируемое состояние, поэтому
 // после частичного успеха в форме остаются только неопубликованные строки с
@@ -25,11 +30,9 @@ interface SentRow extends Row {
   startsAt: string;
   endsAt: string;
   label: string;
-  outcome: 'overlap' | 'invalid' | 'network' | 'unknown';
+  outcome: SubmitFailure['kind'];
   messages: string[];
 }
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function PublishForm({ appTz }: { appTz: string }) {
   const router = useRouter();
@@ -103,7 +106,7 @@ export function PublishForm({ appTz }: { appTz: string }) {
         const outcome = outcomeFromApiError(error);
         failed.push({
           ...attempt,
-          outcome: outcome.kind === 'created' ? 'unknown' : outcome.kind,
+          outcome: outcome.kind,
           messages: outcome.kind === 'invalid' ? outcome.messages : [],
         });
       } catch {
@@ -115,15 +118,8 @@ export function PublishForm({ appTz }: { appTz: string }) {
       // подсказка «пересекается с 11:00–11:30»: список свежий, потому что
       // часть конфликтов — строки, опубликованные этим же заходом
       try {
-        const now = Date.now();
         const { data } = await api.GET('/api/v1/slots', {
-          params: {
-            query: {
-              view: 'all',
-              from: new Date(now - ADMIN_WINDOW_DAYS * MS_PER_DAY).toISOString(),
-              to: new Date(now + ADMIN_WINDOW_DAYS * MS_PER_DAY).toISOString(),
-            },
-          },
+          params: { query: { view: 'all', ...adminWindow() } },
         });
         const slots = data?.slots ?? [];
         for (const f of failed) {

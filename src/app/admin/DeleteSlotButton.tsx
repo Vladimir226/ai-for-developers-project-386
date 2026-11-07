@@ -23,8 +23,9 @@ export function DeleteSlotButton({ id }: { id: string }) {
         setPending(true);
         try {
           await api.DELETE('/api/v1/slots/{id}', { params: { path: { id } } });
-          router.refresh();
         } finally {
+          // refresh и при ошибке/404: список — серверная истина (ADR-004)
+          router.refresh();
           setPending(false);
         }
       }}

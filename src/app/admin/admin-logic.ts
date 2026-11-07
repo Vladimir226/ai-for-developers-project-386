@@ -8,11 +8,14 @@
 export type SlotStatus = 'free' | 'booked' | 'past';
 
 /**
- * Окно списка админ-страницы, дни в обе стороны от «сейчас»: видно недавнее
- * прошлое («Прошёл») и горизонт планирования. 31 день — зеркально дефолтному
- * периоду GET /api/v1/slots (src/lib/validation/slot.ts).
+ * Границы запроса списка админ-страницы: «все опубликованные интервалы»
+ * (FR-002) — от эпохи до далёкого будущего. Дефолтное окно API
+ * (now..now+31 день) скрыло бы прошедшие интервалы («Прошёл») и дальние
+ * планы. Порядок from <= to требуется схемой GET /api/v1/slots.
  */
-export const ADMIN_WINDOW_DAYS = 31;
+export function adminWindow(): { from: string; to: string } {
+  return { from: '1970-01-01T00:00:00.000Z', to: '9999-12-31T23:59:59.999Z' };
+}
 
 /**
  * «Прошёл» приоритетнее: закончившийся звонок не «забронирован» в макете.
@@ -35,12 +38,15 @@ export type SubmitOutcome =
   | { kind: 'network' }
   | { kind: 'unknown' };
 
+/** Неудачный исход — всё, кроме 'created' (для строк, оставшихся в форме). */
+export type SubmitFailure = Exclude<SubmitOutcome, { kind: 'created' }>;
+
 interface ErrorEnvelopeLike {
   error?: { code?: unknown; message?: unknown; details?: unknown };
 }
 
 /** Разбор конверта ошибок (ADR-005): клиент интерпретирует только по коду. */
-export function outcomeFromApiError(error: unknown): SubmitOutcome {
+export function outcomeFromApiError(error: unknown): SubmitFailure {
   const body = (error as ErrorEnvelopeLike | null)?.error;
   if (!body || typeof body !== 'object') return { kind: 'unknown' };
 
@@ -63,7 +69,6 @@ export function outcomeFromApiError(error: unknown): SubmitOutcome {
 }
 
 export interface SlotLike {
-  id?: string;
   startsAt: string;
   endsAt: string;
 }
@@ -71,7 +76,8 @@ export interface SlotLike {
 /**
  * Первый опубликованный слот, пересекающий кандидат (полуинтервалы
  * [startsAt; endsAt), вплотную — не конфликт). Нужно для подсказки
- * «пересекается с 11:00–11:30» в алерте ошибки макета.
+ * «пересекается с 11:00–11:30» в алерте ошибки макета. Дженерик сохраняет
+ * тип элементов списка (включая id) для вызывающего.
  */
 export function findOverlappingSlot<T extends SlotLike>(
   candidate: { startsAt: string; endsAt: string },
