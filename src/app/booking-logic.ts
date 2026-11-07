@@ -207,13 +207,7 @@ export function firstOpenDateKey(calendar: BookingCalendar): string | null {
 
 /** «1 окно / 2 окна / 5 окон» — счётчик под числом в календаре. */
 export function countWindows(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  let form: string;
-  if (mod10 === 1 && mod100 !== 11) form = 'окно';
-  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) form = 'окна';
-  else form = 'окон';
-  return `${n} ${form}`;
+  return `${n} ${pluralRu(n, 'окно', 'окна', 'окон')}`;
 }
 
 /** «1 час 30 минут» — русская плюрализация существительных. */

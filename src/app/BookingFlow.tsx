@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { components } from '@/generated/schema';
 import { createApiClient } from '@/lib/sdk/client';
 import {
@@ -64,6 +64,9 @@ export function BookingFlow({
   // граница актуальности выборки слотов: быстрые переходы между типами
   // не должны скрещивать ответ прошлого запроса с новым состоянием
   const fetchSeq = useRef(0);
+  // точка возврата внимания после 409: список слотов или баннер (пустой день)
+  const bannerRef = useRef<HTMLElement | null>(null);
+  const slotsRef = useRef<HTMLElement | null>(null);
 
   const calendar = slotsState?.phase === 'ready' ? slotsState.calendar : null;
   const month =
@@ -216,6 +219,16 @@ export function BookingFlow({
     setFailure(null);
     if (selectedType) void loadSlots(selectedType.id);
   }
+
+  // После 409 список перезагружается молча — возвращаем внимание гостя
+  // скроллом, как в прежнем флоу (scrollIntoView к списку окон выбранного
+  // дня; если день опустел — к баннеру над ним).
+  useEffect(() => {
+    if (!failure || (failure.kind !== 'booked' && failure.kind !== 'past')) return;
+    if (slotsState?.phase !== 'ready') return;
+    const target = slots.length > 0 ? slotsRef.current : bannerRef.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [failure, slotsState, slots.length]);
 
   // Шаг 1 — виды брони (страница RSC уже принесла список типов)
   if (!selectedType) {
@@ -573,6 +586,7 @@ export function BookingFlow({
               <section
                 aria-label="Ошибка бронирования"
                 role="alert"
+                ref={bannerRef}
                 className="rounded-2xl border border-clay/40 bg-clay-soft p-5"
               >
                 <div className="flex gap-3.5">
@@ -643,6 +657,7 @@ export function BookingFlow({
             ) : (
               <section
                 aria-label="Окна на выбранный день"
+                ref={slotsRef}
                 className="rounded-2xl border border-line bg-card p-5 shadow-[0_1px_3px_rgba(55,53,47,0.04)]"
               >
                 <div className="flex items-baseline justify-between gap-3">
@@ -706,6 +721,7 @@ export function BookingFlow({
                     label="Телефон или email"
                     value={contact}
                     maxLength={200}
+                    minLength={5}
                     required
                     placeholder="+7 900 000-00-00"
                     error={fieldErrors.bookerContact}
@@ -802,6 +818,7 @@ function Field({
   onChange,
   error,
   maxLength,
+  minLength,
   required,
   placeholder,
 }: {
@@ -811,6 +828,7 @@ function Field({
   onChange: (value: string) => void;
   error: string | undefined;
   maxLength: number;
+  minLength?: number;
   required?: boolean;
   placeholder?: string;
 }) {
@@ -826,6 +844,7 @@ function Field({
         value={value}
         required={required}
         maxLength={maxLength}
+        minLength={minLength}
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
