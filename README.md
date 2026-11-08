@@ -197,7 +197,8 @@ Next.js нет — ADR-010); конформанс проверяется integra
 
 ```bash
 npm run check           # всё сразу: eslint + tsc + redocly + drift-check контракта,
-                        # prettier и тесты Vitest (та же команда гоняется в CI)
+                        # prettier, тесты Vitest и e2e Playwright на настоящем
+                        # сервере (та же команда гоняется в CI)
 npm test                # только тесты (unit + API-интеграция)
 npm run lint            # только линтеры
 npm run contract:gen    # перегенерация артефактов контракта после правок contract/
@@ -206,8 +207,9 @@ npm run contract:gen    # перегенерация артефактов кон
 То же самое через Makefile (его цели — клей CI Хекслета): `make install`,
 `make test`, `make lint`, `make check`.
 
-E2E-сценарий (Playwright, шов 2) — отдельной командой; прогон сам собирает
-приложение и поднимает его с временной БД на порту 3100, dev-данные не трогает:
+E2E-сценарий (Playwright, шов 2) идёт внутри `npm run check` / `make check`
+(решение D7 карты #28); прогон сам собирает приложение и поднимает его с
+временной БД на порту 3100, dev-данные не трогает. Отдельно — той же командой:
 
 ```bash
 npx playwright install chromium   # один раз

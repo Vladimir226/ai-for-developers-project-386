@@ -4,11 +4,14 @@ import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { E2E_PORT, e2eDatabaseUrl } from './e2e/paths';
 
-// E2e-прогон шва 2 (GLOSSARY): отдельная команда `npm run test:e2e`, не входит
-// в `make check` / hexlet-check CI (тикет #9). Поднимается собранное
-// приложение (`next build` делает test:e2e) на нестандартном порту из
-// e2e/paths.ts; миграции и старт сервера — в scripts/e2e-server.mjs. Зона —
-// APP_TZ (ADR-009): Europe/Moscow, как в прод-контейнере.
+// E2e-прогон шва 2 (GLOSSARY): входит в единую команду проверок
+// `npm run check` / `make check` и в CI check.yml с кэшем браузеров
+// (карта #28/D7, тикет #38); hexlet-check CI остаётся в стороне — он гоняет
+// свой smoke по собранному Docker-образу и наших npm-команд не запускает.
+// Поднимается собранное приложение (`next build` делает test:e2e) на
+// нестандартном порту из e2e/paths.ts; миграции и старт сервера — в
+// scripts/e2e-server.mjs. Зона — APP_TZ (ADR-009): Europe/Moscow, как в
+// прод-контейнере.
 //
 // Каталог БД (детерминированный путь из paths.ts) пересоздаёт серверный
 // скрипт, убирает globalTeardown. Playwright гасит webServer жёстким SIGKILL

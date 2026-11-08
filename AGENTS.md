@@ -5,7 +5,7 @@
 ```bash
 npm install      # зависимости (postinstall сам выполнит prisma generate); Node 22 — из .nvmrc
 npm run dev      # запуск: http://localhost:3000 (Next.js — бекенд и фронтенд вместе)
-npm run check    # все проверки: lint + prettier + тесты; CI гоняет то же самое (make check)
+npm run check    # все проверки: lint + prettier + юнит-тесты + e2e на настоящем сервере; CI гоняет то же самое (make check)
 npm test         # только тесты (vitest)
 npm run test:e2e # браузерные тесты Playwright на настоящем сервере (сборка и старт — сама команда)
 npm run lint     # только линтеры: eslint + tsc --noEmit + redocly + drift-check контракта
