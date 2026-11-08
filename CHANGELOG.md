@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/Vladimir226/ai-for-developers-project-386/compare/v1.0.0...v1.1.0) (2026-11-08)
+
+
+### Features
+
+* **public:** страница «Предстоящие записи» — публичный список предстоящих броней ([#57](https://github.com/Vladimir226/ai-for-developers-project-386/issues/57)) ([fafd8ba](https://github.com/Vladimir226/ai-for-developers-project-386/commit/fafd8ba84ecfdbf4a2039144cc08e798eee099c3))
+
 ## 1.0.0 (2026-11-08)
 
 ### Features
