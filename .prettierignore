@@ -16,3 +16,7 @@ src/generated
 
 # lock-файл — машинный, форматирование создаёт churn
 package-lock.json
+
+# CHANGELOG генерирует release-please своим форматом (маркеры «*»):
+# файл не наш — prettier его не проверяет, иначе каждый релиз красит CI
+CHANGELOG.md
