@@ -136,8 +136,19 @@ persistent disk 1 ГБ в `/data`, health check `/api/health`. Текущий п
    URL вида `https://book-a-call.onrender.com`.
 
 `PORT` в blueprint не задаётся: Render сам передаёт его сервису (дефолт
-10000), а сервер слушает `${PORT}` — тот же контракт, что и локально. Пуш в
-`main` по умолчанию запускает автодеплой.
+10000), а сервер слушает `${PORT}` — тот же контракт, что и локально.
+
+### Авто-деплой после зелёного CI
+
+Сервис разворачивался через API/MCP без GitHub App, поэтому пуш-вебхуков
+Render на репозитории нет — «просто push в main» его не будит. Вместо
+переподключения источника деплой запускает GitHub Action
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): после
+успешного workflow `check` на `main` он дёргает **Deploy Hook** сервиса
+(секрет `RENDER_DEPLOY_HOOK` в Actions Secrets; ротация — Render →
+Settings → Deploy Hook → Regenerate). Прод получает только код,
+прошедший `make check`. Ручной путь остаётся: Render → Manual Deploy →
+Deploy latest commit.
 
 ### Публичная ссылка
 
