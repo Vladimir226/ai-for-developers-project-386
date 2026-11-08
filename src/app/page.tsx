@@ -50,12 +50,20 @@ export default async function HomePage() {
               Запись на звонок
             </span>
           </Link>
-          <Link
-            href="/admin"
-            className="text-[13.5px] sm:text-sm font-medium text-muted hover:text-sage transition-colors whitespace-nowrap"
-          >
-            Панель владельца&nbsp;&rarr;
-          </Link>
+          <nav className="flex items-center gap-4 sm:gap-5 text-[13.5px] sm:text-sm font-medium">
+            <Link
+              href="/bookings"
+              className="text-muted hover:text-sage transition-colors whitespace-nowrap"
+            >
+              Предстоящие записи&nbsp;&rarr;
+            </Link>
+            <Link
+              href="/admin"
+              className="text-muted hover:text-sage transition-colors whitespace-nowrap"
+            >
+              Панель владельца&nbsp;&rarr;
+            </Link>
+          </nav>
         </div>
       </header>
 

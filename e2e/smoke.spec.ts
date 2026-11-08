@@ -15,6 +15,8 @@ test('публичная страница отвечает 200', async ({ page }
   const response = await page.goto('/');
   expect(response?.status()).toBe(200);
   await expect(page.getByRole('link', { name: 'Панель владельца' })).toBeVisible();
+  // навигация на «Предстоящие записи» (#57)
+  await expect(page.getByRole('link', { name: 'Предстоящие записи' })).toBeVisible();
 });
 
 test('панель владельца отвечает 200 и показывает секции', async ({ page }) => {
@@ -33,4 +35,15 @@ test('GET /api/health отвечает {"status":"ok"}', async ({ request }) => 
   const response = await request.get('/api/health');
   expect(response.status()).toBe(200);
   expect(await response.json()).toEqual({ status: 'ok' });
+});
+
+test('«Предстоящие записи» отвечают 200 и показывают пустое состояние', async ({ page }) => {
+  // публичный список броней всех гостей (#57, ADR-0012): серверный рендер
+  // self-fetch'ем, на свежей базе — пустое состояние с CTA на публичную
+  // страницу; отмена и карточки — в booking-flow.spec.ts
+  const response = await page.goto('/bookings');
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Предстоящие записи' })).toBeVisible();
+  await expect(page.getByText('Предстоящих звонков нет')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Записаться на звонок' })).toBeVisible();
 });

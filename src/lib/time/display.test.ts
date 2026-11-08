@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countActiveBookings,
   countIntervals,
+  formatDayTime,
   formatInterval,
   formatTimeRange,
   tzLabel,
@@ -42,6 +43,19 @@ describe('formatTimeRange', () => {
     expect(
       formatTimeRange('2026-11-10T20:00:00.000Z', '2026-11-10T21:15:00.000Z', 'Europe/Moscow'),
     ).toBe('вт, 10 ноября · 23:00 – ср, 11 ноября · 00:15');
+  });
+});
+
+describe('formatDayTime', () => {
+  // Пиннинг-тест допущения (process.md): ru-RU Intl сам вставляет предлог
+  // «в» между датой и временем при совместном формате — на этом держится
+  // подпись «создана 7 ноября в 18:40» прототипа events.html (#57).
+  it('дата и время одним форматом — предлог «в» вставляет Intl', () => {
+    expect(formatDayTime('2026-11-07T15:40:00.000Z', 'Europe/Moscow')).toBe('7 ноября в 18:40');
+  });
+
+  it('UTC-зона: метки без сдвига', () => {
+    expect(formatDayTime('2026-11-07T15:40:00.000Z', 'UTC')).toBe('7 ноября в 15:40');
   });
 });
 

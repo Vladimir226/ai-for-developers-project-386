@@ -49,6 +49,21 @@ export function formatTimeRange(startsAt: string, endsAt: string, timeZone: stri
 }
 
 /**
+ * День и время одним форматом: «7 ноября в 18:40». Предлог «в» между датой
+ * и временем вставляет сам ru-RU Intl (пиннинг-тест в display.test) — на
+ * этом держится подпись «создана …» карточек брони (events.html, #57).
+ */
+export function formatDayTime(instant: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone,
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(instant));
+}
+
+/**
  * Человекочитаемое имя зоны из CLDR: первый сегмент длинного имени
  * («Москва, стандартное время» → «Москва»; для регионов — «Индия»,
  * «Восточная Америка»). Fallback — идентификатор зоны.

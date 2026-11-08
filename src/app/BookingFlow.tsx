@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { components } from '@/generated/schema';
@@ -420,6 +421,13 @@ export function BookingFlow({
           >
             Забронировать ещё
           </button>
+          {/* «Предстоящие записи» (#57): гость продолжает путь к списку брони */}
+          <Link
+            href="/bookings"
+            className="h-11 inline-flex items-center px-5 rounded-xl border border-line hover:border-sage hover:text-sage text-[14px] font-semibold transition"
+          >
+            Предстоящие записи&nbsp;&rarr;
+          </Link>
           <button
             type="button"
             onClick={() => {
