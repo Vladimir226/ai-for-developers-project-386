@@ -18,3 +18,4 @@
 | ADR-009 | 2026-11-07 | Время: хранение/передача UTC ISO-8601; отображение в `APP_TZ` (default Europe/Moscow) на сервере _(поправлен аддендумом #5: ввод настенного времени — `wallTimeToUtcIso` на клиенте)_      | Accepted               |
 | ADR-010 | 2026-11-07 | Контракт-фёрст: TypeSpec → OpenAPI → SDK (openapi-typescript/openapi-fetch) + Zod (openapi-zod-client); `view=free\|all` в GET slots; сервер по контракту, drift-check в `make lint`       | Accepted               |
 | ADR-011 | 2026-11-07 | Слоты вычисляются из типов событий × рабочие часы × окно 14 дней; бронь = тип + старт + контакты; занятость = наложение полуинтервалов между всеми типами; гонки — транзакция с предикатом | Accepted               |
+| ADR-012 | 2026-11-08 | Публичная страница «Предстоящие записи» (/bookings): все предстоящие брони всех гостей, read-only, без auth (ADR-003); существующий `GET /bookings?upcoming`, без изменений контракта      | Accepted               |
