@@ -107,6 +107,8 @@ test.describe('выбор типа → календарь → слот → бр�
     await expect(confirmed).toContainText(dayTitle(day!.dateKey));
     await expect(confirmed).toContainText(label);
     await expect(confirmed).toContainText('Мария');
+    // продолжение пути гостя — ссылка на «Предстоящие записи» (#57)
+    await expect(confirmed.getByRole('link', { name: 'Предстоящие записи' })).toBeVisible();
 
     // 6. Слот исчез из свободных: возврат к бронированию перечитывает список
     const reload = page.waitForResponse(
@@ -142,6 +144,26 @@ test.describe('выбор типа → календарь → слот → бр�
       comment: 'Хочу обсудить проект',
       eventType: { id: call30.id, title: 'Созвон 30', durationMinutes: 30 },
     });
+
+    // 8. «Предстоящие записи» (#57, ADR-0012): публичный список показывает
+    //    брони всех гостей — карточка с типом, интервалом, именем и бейджем
+    await page.goto('/bookings');
+    const publicCard = page.locator('section[aria-label="Предстоящие записи"] li', {
+      hasText: 'Мария',
+    });
+    await expect(publicCard).toBeVisible();
+    await expect(publicCard).toContainText('Созвон 30');
+    await expect(publicCard).toContainText(label);
+    await expect(publicCard).toContainText('Подтверждена');
+
+    // 9. Отмена владельцем (тот же DELETE, что кнопка админки #36) убирает
+    //    бронь и из публичного списка — страница перерисовалась пустым
+    //    состоянием с CTA
+    const cancel = await request.delete(`/api/v1/bookings/${mine!.id}`);
+    expect(cancel.status(), 'отмена брони владельцем').toBe(204);
+    await page.reload();
+    await expect(page.getByText('Предстоящих звонков нет')).toBeVisible();
+    await expect(publicCard).toHaveCount(0);
   });
 
   test('конкурентное занятие: соперник успел раньше — баннер «Это время только что заняли», слот пропадает', async ({

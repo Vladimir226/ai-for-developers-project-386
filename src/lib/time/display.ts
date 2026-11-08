@@ -4,8 +4,10 @@
 // компонентах (подсказки ошибок).
 //
 // Грабли ru-RU, зафиксированные тестами: Intl сам вставляет предлог «в»
-// между датой и временем, поэтому день и время форматируются раздельно
-// и склеиваются разделителем макета «·».
+// между датой и временем, поэтому в интервалах день и время форматируются
+// раздельно и склеиваются разделителем макета «·»; а вот formatDayTime,
+// наоборот, намеренно берёт совместный формат — предлог «в» там и нужен
+// («создана 7 ноября в 18:40», #57).
 
 function dayFormatter(timeZone: string): Intl.DateTimeFormat {
   return new Intl.DateTimeFormat('ru-RU', {
@@ -46,6 +48,21 @@ export function formatTimeRange(startsAt: string, endsAt: string, timeZone: stri
     return `${time.format(start)}–${time.format(end)}`;
   }
   return formatInterval(startsAt, endsAt, timeZone);
+}
+
+/**
+ * День и время одним форматом: «7 ноября в 18:40». Предлог «в» между датой
+ * и временем вставляет сам ru-RU Intl (пиннинг-тест в display.test) — на
+ * этом держится подпись «создана …» карточек брони (events.html, #57).
+ */
+export function formatDayTime(instant: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone,
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(instant));
 }
 
 /**
