@@ -6,6 +6,21 @@
 # на соединении самого приложения (getDb), здесь он был бы бесполезен.
 set -e
 
+# Каталог БД может быть примонтированным volume (docker -v, диск Render), и
+# права на него задаёт платформа — проверяем запись до миграций, чтобы падать
+# с понятной причиной, а не EACCES из глубины Prisma. Относительный путь
+# Prisma резолвит от prisma/ — считаем так же.
+DB_PATH="${DATABASE_URL#file:}"
+case "$DB_PATH" in /*) ;; *) DB_PATH="prisma/$DB_PATH" ;; esac
+DATA_DIR=$(dirname "$DB_PATH")
+mkdir -p "$DATA_DIR" 2>/dev/null || true
+if ! touch "$DATA_DIR/.write-check" 2>/dev/null; then
+  echo "[entrypoint] не могу писать в $DATA_DIR (uid=$(id -u), user=$(id -un)):" >&2
+  echo "  проверьте права volume/диска на этот каталог (см. README, «Деплой»)" >&2
+  exit 1
+fi
+rm -f "$DATA_DIR/.write-check"
+
 echo "[entrypoint] применяю prisma-миграции…" >&2
 node node_modules/prisma/build/index.js migrate deploy
 

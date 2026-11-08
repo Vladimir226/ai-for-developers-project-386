@@ -1,0 +1,24 @@
+# Blueprint Render (решение D9, #41): деплой того же Docker-образа репозитория.
+# Подключение: Render Dashboard → New + Existing Project → Blueprint → этот репозиторий.
+# Схема полей: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: book-a-call
+    runtime: docker
+    # starter (legacy-имя плана 0.5c-512mb) — минимальный платный план:
+    # persistent disk на free-плане недоступен (https://render.com/docs/free)
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_TZ
+        value: Europe/Moscow
+      - key: DATABASE_URL
+        value: file:/data/app.db
+      # PORT отдельно не задаём: Render сам отдаёт его сервису (дефолт 10000),
+      # а контейнер слушает ${PORT:-3000} (docker-entrypoint.sh → server.js)
+    disk:
+      name: book-a-call-data
+      mountPath: /data
+      sizeGB: 1
